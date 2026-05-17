@@ -10,6 +10,7 @@ var display_name := "Pet"
 var team := "cat"
 var role := "striker"
 var is_player := false
+var level := 1
 
 var body_color := Color(1.0, 0.62, 0.26)
 var accent_color := Color(1.0, 0.88, 0.44)
@@ -65,6 +66,17 @@ func setup(data: Dictionary, pet_team: String, player_controlled: bool, ai_role:
 	attack_cooldown = data.get("attack_cooldown", attack_cooldown)
 	skill_type = data.get("skill_type", skill_type)
 	skill_cooldown_max = data.get("skill_cooldown", skill_cooldown_max)
+
+
+func apply_level(pet_level: int) -> void:
+	level = max(1, pet_level)
+	if level <= 1:
+		return
+	var bonus := float(level - 1)
+	max_hp += bonus * 8.0
+	hp = max_hp
+	move_speed += bonus * 5.0
+	attack_damage += bonus * 1.5
 
 
 func _ready() -> void:
@@ -222,7 +234,8 @@ func _update_label() -> void:
 	if _name_label == null:
 		return
 	var prefix := "P " if is_player else ""
-	_name_label.text = prefix + display_name
+	var suffix := " Lv.%d" % level if is_player else ""
+	_name_label.text = prefix + display_name + suffix
 
 
 func _draw() -> void:

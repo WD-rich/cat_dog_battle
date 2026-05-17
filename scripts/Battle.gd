@@ -3,6 +3,7 @@ extends Node2D
 const PetScript := preload("res://scripts/Pet.gd")
 const BaseScript := preload("res://scripts/Base.gd")
 const ItemScript := preload("res://scripts/Item.gd")
+const GameDataScript := preload("res://scripts/GameData.gd")
 
 const MAP_RECT := Rect2(44, 74, 1192, 592)
 const CAT_BASE_POS := Vector2(138, 360)
@@ -25,15 +26,21 @@ var player_pet: Node = null
 var player_team := "cat"
 var enemy_team := "dog"
 var match_over := false
+var match_time_limit := 180.0
+var match_time_left := 180.0
 var boom_respawn_timer := 0.0
 var aux_spawn_timer := 4.0
 var elapsed := 0.0
+var last_event := ""
+var event_timer := 0.0
 var rng := RandomNumberGenerator.new()
 
 var hud_layer: CanvasLayer
 var score_label: Label
 var status_label: Label
 var cooldown_label: Label
+var objective_label: Label
+var event_label: Label
 var result_panel: Panel
 var result_label: Label
 
@@ -42,6 +49,7 @@ func _ready() -> void:
 	rng.randomize()
 	player_team = GameState.player_team
 	enemy_team = "dog" if player_team == "cat" else "cat"
+	match_time_left = match_time_limit
 	_create_map()
 	_create_bases()
 	_create_pets()
@@ -49,6 +57,7 @@ func _ready() -> void:
 	_spawn_item("boom", Vector2(640, 360))
 	_spawn_item("repair", Vector2(640, 150))
 	_spawn_item("shield", Vector2(640, 570))
+	_show_event("Grab the Boom Snack and invade the enemy base.")
 	update_hud()
 
 
@@ -59,6 +68,12 @@ func _physics_process(delta: float) -> void:
 		return
 
 	elapsed += delta
+	match_time_left = max(0.0, match_time_left - delta)
+	if event_timer > 0.0:
+		event_timer = max(0.0, event_timer - delta)
+	if match_time_left <= 0.0:
+		_finish_by_time()
+		return
 	_handle_player_input()
 	for pet in pets:
 		if pet != player_pet:
@@ -125,10 +140,20 @@ func _create_bases() -> void:
 
 
 func _create_pets() -> void:
-	var cat_keys := ["orange_cat", "calico_cat", "ragdoll_cat"]
-	var dog_keys := ["shiba_dog", "corgi_dog", "husky_dog"]
+	var cat_keys := _team_lineup("cat")
+	var dog_keys := _team_lineup("dog")
 	_create_team("cat", cat_keys, CAT_BASE_POS + Vector2(120, 0))
 	_create_team("dog", dog_keys, DOG_BASE_POS + Vector2(-120, 0))
+
+
+func _team_lineup(team: String) -> Array:
+	var keys := GameDataScript.team_pet_keys(team)
+	if team == player_team:
+		var selected := GameState.get_selected_pet(team)
+		if keys.has(selected):
+			keys.erase(selected)
+			keys.insert(0, selected)
+	return keys
 
 
 func _create_team(team: String, keys: Array, center: Vector2) -> void:
@@ -137,7 +162,9 @@ func _create_team(team: String, keys: Array, center: Vector2) -> void:
 	for i in range(keys.size()):
 		var pet := PetScript.new()
 		var controlled := team == player_team and i == 0
-		pet.setup(_pet_data(keys[i]), team, controlled, roles[i], self)
+		pet.setup(GameDataScript.pet_data(keys[i]), team, controlled, roles[i], self)
+		if controlled:
+			pet.apply_level(GameState.get_pet_level(keys[i]))
 		pet.home_base = bases[team]
 		pet.target_base = bases[_other_team(team)]
 		pet.global_position = center + offsets[i]
@@ -173,6 +200,22 @@ func _create_hud() -> void:
 	cooldown_label.add_theme_font_size_override("font_size", 16)
 	cooldown_label.add_theme_color_override("font_color", Color(0.20, 0.13, 0.09))
 	hud_layer.add_child(cooldown_label)
+
+	objective_label = Label.new()
+	objective_label.position = Vector2(390, 48)
+	objective_label.size = Vector2(500, 30)
+	objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	objective_label.add_theme_font_size_override("font_size", 16)
+	objective_label.add_theme_color_override("font_color", Color(0.20, 0.13, 0.09))
+	hud_layer.add_child(objective_label)
+
+	event_label = Label.new()
+	event_label.position = Vector2(390, 88)
+	event_label.size = Vector2(500, 42)
+	event_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	event_label.add_theme_font_size_override("font_size", 20)
+	event_label.add_theme_color_override("font_color", Color(0.80, 0.18, 0.10))
+	hud_layer.add_child(event_label)
 
 	result_panel = Panel.new()
 	result_panel.visible = false
@@ -376,10 +419,12 @@ func _process_deliveries() -> void:
 		var enemy_base: BattleBase = bases[_other_team(pet.team)]
 		if carried.kind == "boom" and enemy_base.contains_point(pet.global_position):
 			enemy_base.damage(1)
+			_show_event("%s damaged the %s base." % [pet.display_name, enemy_base.team.capitalize()])
 			_consume_item(carried)
 			boom_respawn_timer = 2.0
 		elif carried.kind == "repair" and home_base.contains_point(pet.global_position):
 			if home_base.repair(1):
+				_show_event("%s repaired the %s base." % [pet.display_name, home_base.team.capitalize()])
 				_consume_item(carried)
 
 
@@ -394,6 +439,7 @@ func _tick_spawners(delta: float) -> void:
 		boom_respawn_timer -= delta
 		if boom_respawn_timer <= 0.0 and _closest_free_item(Vector2(640, 360), ["boom"]) == null and _find_item_any("boom") == null:
 			_spawn_item("boom", Vector2(640, 360))
+			_show_event("Boom Snack respawned in the center.")
 
 	aux_spawn_timer -= delta
 	if aux_spawn_timer <= 0.0:
@@ -422,17 +468,42 @@ func _consume_item(item: Node) -> void:
 
 func _on_base_destroyed(base: BattleBase) -> void:
 	var winner := _other_team(base.team)
+	_finish_match(winner, "%s base destroyed" % base.team.capitalize())
+
+
+func _finish_by_time() -> void:
+	if bases["cat"].durability > bases["dog"].durability:
+		_finish_match("cat", "Time up")
+	elif bases["dog"].durability > bases["cat"].durability:
+		_finish_match("dog", "Time up")
+	else:
+		_finish_match("draw", "Time up")
+
+
+func _finish_match(winner: String, reason: String) -> void:
+	if match_over:
+		return
 	match_over = true
-	GameState.record_match(winner, bases["cat"].durability, bases["dog"].durability)
+	var reward := GameState.record_match(winner, bases["cat"].durability, bases["dog"].durability, elapsed)
 	result_panel.visible = true
-	var result := "VICTORY" if winner == player_team else "DEFEAT"
-	result_label.text = "%s\n%s team wins\nPress Enter to return" % [result, winner.capitalize()]
+	var result := "DRAW"
+	if winner == player_team:
+		result = "VICTORY"
+	elif winner != "draw":
+		result = "DEFEAT"
+	result_label.text = "%s\n%s\nReward +%d coins\nPress Enter to prep" % [result, reason, reward]
 
 
 func update_hud() -> void:
 	if score_label == null:
 		return
-	score_label.text = "Cats %d / 5     Dogs %d / 5" % [bases["cat"].durability, bases["dog"].durability]
+	var time_seconds := int(match_time_left)
+	score_label.text = "Cats %d / 5     Dogs %d / 5     %02d:%02d" % [
+		bases["cat"].durability,
+		bases["dog"].durability,
+		int(time_seconds / 60.0),
+		time_seconds % 60
+	]
 	if player_pet != null:
 		var item_name := "None" if player_pet.carried_item == null else player_pet.carried_item.kind.capitalize()
 		cooldown_label.text = "HP %d/%d\nSkill %.1fs\nCarrying: %s\nCoins: %d" % [
@@ -442,7 +513,14 @@ func update_hud() -> void:
 			item_name,
 			GameState.coins
 		]
-	status_label.text = "Boom Snack: enemy base -1   Repair Can: your base +1   Bell: speed   Shield: block one push   Sock: throw to slow"
+	objective_label.text = "Carry Boom Snack to enemy base. Stop enemies carrying it to yours."
+	event_label.text = last_event if event_timer > 0.0 else ""
+	status_label.text = "Boom: damage enemy base   Repair: restore your base   Bell: speed   Shield: escort   Sock: throw to slow"
+
+
+func _show_event(message: String) -> void:
+	last_event = message
+	event_timer = 2.8
 
 
 func clamp_to_map(point: Vector2) -> Vector2:
@@ -534,87 +612,3 @@ func _find_allied_carrier(team: String) -> Node:
 
 func _other_team(team: String) -> String:
 	return "dog" if team == "cat" else "cat"
-
-
-func _pet_data(key: String) -> Dictionary:
-	var all := {
-		"orange_cat": {
-			"key": "orange_cat",
-			"name": "Orange",
-			"body_color": Color(1.0, 0.54, 0.23),
-			"accent_color": Color(1.0, 0.82, 0.32),
-			"hp": 120.0,
-			"speed": 235.0,
-			"attack_damage": 18.0,
-			"attack_range": 62.0,
-			"attack_cooldown": 0.56,
-			"skill_type": "dash",
-			"skill_cooldown": 4.8,
-		},
-		"calico_cat": {
-			"key": "calico_cat",
-			"name": "Calico",
-			"body_color": Color(1.0, 0.78, 0.52),
-			"accent_color": Color(0.37, 0.22, 0.16),
-			"hp": 96.0,
-			"speed": 290.0,
-			"attack_damage": 15.0,
-			"attack_range": 58.0,
-			"attack_cooldown": 0.45,
-			"skill_type": "sprint",
-			"skill_cooldown": 5.0,
-		},
-		"ragdoll_cat": {
-			"key": "ragdoll_cat",
-			"name": "Ragdoll",
-			"body_color": Color(0.78, 0.86, 1.0),
-			"accent_color": Color(0.43, 0.36, 0.56),
-			"hp": 106.0,
-			"speed": 240.0,
-			"attack_damage": 13.0,
-			"attack_range": 86.0,
-			"attack_cooldown": 0.64,
-			"skill_type": "pulse",
-			"skill_cooldown": 5.8,
-		},
-		"shiba_dog": {
-			"key": "shiba_dog",
-			"name": "Shiba",
-			"body_color": Color(0.94, 0.43, 0.18),
-			"accent_color": Color(1.0, 0.89, 0.66),
-			"hp": 112.0,
-			"speed": 255.0,
-			"attack_damage": 18.0,
-			"attack_range": 64.0,
-			"attack_cooldown": 0.54,
-			"skill_type": "dash",
-			"skill_cooldown": 4.6,
-		},
-		"corgi_dog": {
-			"key": "corgi_dog",
-			"name": "Corgi",
-			"body_color": Color(0.95, 0.67, 0.28),
-			"accent_color": Color(0.98, 0.92, 0.78),
-			"hp": 135.0,
-			"speed": 220.0,
-			"attack_damage": 16.0,
-			"attack_range": 58.0,
-			"attack_cooldown": 0.58,
-			"skill_type": "shield",
-			"skill_cooldown": 6.2,
-		},
-		"husky_dog": {
-			"key": "husky_dog",
-			"name": "Husky",
-			"body_color": Color(0.52, 0.65, 0.77),
-			"accent_color": Color(0.94, 0.97, 1.0),
-			"hp": 100.0,
-			"speed": 286.0,
-			"attack_damage": 14.0,
-			"attack_range": 64.0,
-			"attack_cooldown": 0.43,
-			"skill_type": "sprint",
-			"skill_cooldown": 5.1,
-		},
-	}
-	return all[key]
