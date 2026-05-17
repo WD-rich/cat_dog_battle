@@ -259,7 +259,7 @@ func _handle_player_input() -> void:
 	dir += touch_move
 	player_pet.desired_move = dir
 
-	var mouse_dir := get_global_mouse_position() - player_pet.global_position
+	var mouse_dir = get_global_mouse_position() - player_pet.global_position
 	if mouse_dir.length() > 8.0:
 		player_pet.aim_direction = mouse_dir.normalized()
 	elif dir.length() > 0.1:
@@ -282,7 +282,7 @@ func _drive_ai(pet: Node, delta: float) -> void:
 		pet.ai_think_timer = rng.randf_range(0.12, 0.28)
 		pet.ai_target_position = _choose_ai_target(pet)
 
-	var to_target := pet.ai_target_position - pet.global_position
+	var to_target = pet.ai_target_position - pet.global_position
 	pet.desired_move = to_target.normalized() if to_target.length() > 20.0 else Vector2.ZERO
 	if pet.desired_move.length() > 0.1:
 		pet.aim_direction = pet.desired_move
@@ -313,7 +313,7 @@ func _choose_ai_target(pet: Node) -> Vector2:
 
 	var enemy_carrier := _find_enemy_carrier(pet.team)
 	if enemy_carrier != null:
-		var danger_distance := enemy_carrier.global_position.distance_to(bases[pet.team].global_position)
+		var danger_distance = enemy_carrier.global_position.distance_to(bases[pet.team].global_position)
 		if pet.role == "defender" or danger_distance < 470.0:
 			return enemy_carrier.global_position
 
@@ -354,13 +354,13 @@ func _should_ai_skill(pet: Node, enemy: Node) -> bool:
 func pet_attack(attacker: Node) -> bool:
 	var target := _nearest_enemy_pet(attacker.global_position, attacker.team, attacker.attack_range)
 	if target != null:
-		var dir := (target.global_position - attacker.global_position).normalized()
+		var dir = (target.global_position - attacker.global_position).normalized()
 		target.take_damage(attacker.attack_damage, dir * 330.0, attacker)
 		return true
 
 	var item := _nearest_free_item(attacker.global_position, attacker.attack_range + 8.0)
 	if item != null:
-		var dir := attacker.aim_direction.normalized()
+		var dir = attacker.aim_direction.normalized()
 		if dir.length() < 0.1:
 			dir = (item.global_position - attacker.global_position).normalized()
 		item.kick(dir, 610.0)
@@ -372,9 +372,9 @@ func area_burst(source: Node, radius: float, damage: float, knock_force: float) 
 	for target in pets:
 		if target.team == source.team or target.defeated:
 			continue
-		var distance := source.global_position.distance_to(target.global_position)
+		var distance = source.global_position.distance_to(target.global_position)
 		if distance <= radius:
-			var dir := (target.global_position - source.global_position).normalized()
+			var dir = (target.global_position - source.global_position).normalized()
 			target.take_damage(damage, dir * knock_force, source)
 	for item in items:
 		if item.held_by == null and source.global_position.distance_to(item.global_position) <= radius:
@@ -390,7 +390,7 @@ func _process_dash_hits() -> void:
 				continue
 			if pet.global_position.distance_to(target.global_position) <= 52.0:
 				pet.dash_hit_targets.append(target)
-				var dir := (target.global_position - pet.global_position).normalized()
+				var dir = (target.global_position - pet.global_position).normalized()
 				target.take_damage(20.0, dir * 520.0, pet)
 		for item in items:
 			if item.held_by == null and pet.global_position.distance_to(item.global_position) <= 50.0:
@@ -405,7 +405,7 @@ func _process_sock_hits() -> void:
 			if pet.team == item.thrown_by_team or pet.defeated:
 				continue
 			if pet.global_position.distance_to(item.global_position) <= 34.0:
-				var dir := (pet.global_position - item.global_position).normalized()
+				var dir = (pet.global_position - item.global_position).normalized()
 				pet.take_damage(5.0, dir * 260.0, null)
 				pet.add_slow(2.2)
 				_consume_item(item)
@@ -418,7 +418,7 @@ func _process_item_pickups() -> void:
 			continue
 		var closest := _nearest_free_item(pet.global_position, 36.0)
 		if closest != null and closest.can_pick_up():
-			var was_carry_item := closest.is_carry_item()
+			var was_carry_item = closest.is_carry_item()
 			closest.pickup(pet)
 			if not was_carry_item:
 				items.erase(closest)
@@ -428,7 +428,7 @@ func _process_deliveries() -> void:
 	for pet in pets:
 		if pet.defeated or pet.carried_item == null:
 			continue
-		var carried := pet.carried_item
+		var carried = pet.carried_item
 		var home_base: BattleBase = bases[pet.team]
 		var enemy_base: BattleBase = bases[_other_team(pet.team)]
 		if carried.kind == "boom" and enemy_base.contains_point(pet.global_position):
@@ -519,7 +519,7 @@ func update_hud() -> void:
 		time_seconds % 60
 	]
 	if player_pet != null:
-		var item_name := "None" if player_pet.carried_item == null else player_pet.carried_item.kind.capitalize()
+		var item_name = "None" if player_pet.carried_item == null else player_pet.carried_item.kind.capitalize()
 		cooldown_label.text = "HP %d/%d\nSkill %.1fs\nCarrying: %s\nCoins: %d" % [
 			int(ceil(player_pet.hp)),
 			int(ceil(player_pet.max_hp)),

@@ -37,6 +37,15 @@
 2. 用 Godot 打开本文件夹。
 3. 打开后运行主场景 `scenes/Main.tscn`。
 
+## Web 试玩
+
+```bash
+bash tools/export_web.sh
+python3 -m http.server 8765 --bind 127.0.0.1 --directory builds/web
+```
+
+打开 `http://127.0.0.1:8765`。
+
 ## 平台计划
 
 当前项目已经为多平台做了最小准备：

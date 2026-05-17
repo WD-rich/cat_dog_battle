@@ -20,13 +20,28 @@ res://scenes/Main.tscn
 
 Godot 4 Web export supports GDScript projects. This project already uses the Compatibility renderer, which is the correct renderer family for Web export.
 
-Recommended export path:
+First-version Web build command:
+
+```bash
+bash tools/export_web.sh
+python3 -m http.server 8765 --bind 127.0.0.1 --directory builds/web
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8765
+```
+
+The generated files live under:
 
 ```text
 builds/web/index.html
 ```
 
-Basic steps:
+Do not open the exported HTML through `file://`; use a small local server instead.
+
+Editor export steps:
 
 1. Open Godot.
 2. Install export templates if Godot asks for them.
@@ -35,8 +50,6 @@ Basic steps:
 5. Set the output file to `builds/web/index.html`.
 6. Disable threaded export unless the hosting server is configured for cross-origin isolation.
 7. Export and serve the folder through a local or remote web server.
-
-Do not open the exported HTML through `file://`; use a small local server instead.
 
 ## Android
 
@@ -56,4 +69,3 @@ Basic steps:
 6. Export an APK for device testing.
 
 The battle scene already shows touch controls on Android/mobile builds.
-
