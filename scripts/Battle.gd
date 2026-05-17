@@ -1,0 +1,620 @@
+extends Node2D
+
+const PetScript := preload("res://scripts/Pet.gd")
+const BaseScript := preload("res://scripts/Base.gd")
+const ItemScript := preload("res://scripts/Item.gd")
+
+const MAP_RECT := Rect2(44, 74, 1192, 592)
+const CAT_BASE_POS := Vector2(138, 360)
+const DOG_BASE_POS := Vector2(1142, 360)
+
+var pets: Array = []
+var items: Array = []
+var bases := {}
+var obstacle_rects: Array[Rect2] = []
+var aux_spawn_points := [
+	Vector2(640, 150),
+	Vector2(640, 570),
+	Vector2(355, 215),
+	Vector2(925, 505),
+	Vector2(355, 505),
+	Vector2(925, 215),
+]
+
+var player_pet: Node = null
+var player_team := "cat"
+var enemy_team := "dog"
+var match_over := false
+var boom_respawn_timer := 0.0
+var aux_spawn_timer := 4.0
+var elapsed := 0.0
+var rng := RandomNumberGenerator.new()
+
+var hud_layer: CanvasLayer
+var score_label: Label
+var status_label: Label
+var cooldown_label: Label
+var result_panel: Panel
+var result_label: Label
+
+
+func _ready() -> void:
+	rng.randomize()
+	player_team = GameState.player_team
+	enemy_team = "dog" if player_team == "cat" else "cat"
+	_create_map()
+	_create_bases()
+	_create_pets()
+	_create_hud()
+	_spawn_item("boom", Vector2(640, 360))
+	_spawn_item("repair", Vector2(640, 150))
+	_spawn_item("shield", Vector2(640, 570))
+	update_hud()
+
+
+func _physics_process(delta: float) -> void:
+	if match_over:
+		if Input.is_key_pressed(KEY_ENTER) or Input.is_key_pressed(KEY_SPACE):
+			get_tree().change_scene_to_file("res://scenes/Main.tscn")
+		return
+
+	elapsed += delta
+	_handle_player_input()
+	for pet in pets:
+		if pet != player_pet:
+			_drive_ai(pet, delta)
+
+	_process_dash_hits()
+	_process_sock_hits()
+	_process_item_pickups()
+	_process_deliveries()
+	_process_item_bounds()
+	_tick_spawners(delta)
+	update_hud()
+
+
+func _draw() -> void:
+	draw_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), Color(0.99, 0.93, 0.78), true, 0.0)
+	draw_rect(MAP_RECT, Color(0.94, 0.84, 0.65), true, 0.0)
+	draw_rect(MAP_RECT, Color(0.26, 0.17, 0.11), false, 5.0)
+	draw_rect(Rect2(Vector2(438, 242), Vector2(404, 236)), Color(0.86, 0.58, 0.45, 0.46), true, 0.0)
+	draw_rect(Rect2(Vector2(438, 242), Vector2(404, 236)), Color(0.51, 0.30, 0.22), false, 3.0)
+	draw_circle(Vector2(640, 360), 56, Color(1.0, 0.82, 0.32, 0.22))
+	draw_circle(Vector2(640, 360), 56, Color(0.63, 0.43, 0.14, 0.55), false, 3.0)
+
+	for rect in obstacle_rects:
+		draw_rect(rect, Color(0.64, 0.40, 0.28), true, 0.0)
+		draw_rect(rect, Color(0.24, 0.14, 0.09), false, 4.0)
+		draw_line(rect.position + Vector2(8, 8), rect.position + rect.size - Vector2(8, 8), Color(0.78, 0.55, 0.38), 2.0)
+
+
+func _create_map() -> void:
+	obstacle_rects = [
+		Rect2(Vector2(310, 110), Vector2(126, 92)),
+		Rect2(Vector2(318, 510), Vector2(146, 84)),
+		Rect2(Vector2(816, 110), Vector2(146, 84)),
+		Rect2(Vector2(844, 512), Vector2(126, 92)),
+		Rect2(Vector2(548, 90), Vector2(184, 58)),
+		Rect2(Vector2(548, 572), Vector2(184, 58)),
+	]
+
+	for rect in obstacle_rects:
+		var body := StaticBody2D.new()
+		body.position = rect.position + rect.size * 0.5
+		var shape_node := CollisionShape2D.new()
+		var shape := RectangleShape2D.new()
+		shape.size = rect.size
+		shape_node.shape = shape
+		body.add_child(shape_node)
+		add_child(body)
+	queue_redraw()
+
+
+func _create_bases() -> void:
+	var cat_base := BaseScript.new()
+	cat_base.setup("cat", CAT_BASE_POS)
+	cat_base.destroyed.connect(_on_base_destroyed)
+	add_child(cat_base)
+	bases["cat"] = cat_base
+
+	var dog_base := BaseScript.new()
+	dog_base.setup("dog", DOG_BASE_POS)
+	dog_base.destroyed.connect(_on_base_destroyed)
+	add_child(dog_base)
+	bases["dog"] = dog_base
+
+
+func _create_pets() -> void:
+	var cat_keys := ["orange_cat", "calico_cat", "ragdoll_cat"]
+	var dog_keys := ["shiba_dog", "corgi_dog", "husky_dog"]
+	_create_team("cat", cat_keys, CAT_BASE_POS + Vector2(120, 0))
+	_create_team("dog", dog_keys, DOG_BASE_POS + Vector2(-120, 0))
+
+
+func _create_team(team: String, keys: Array, center: Vector2) -> void:
+	var roles := ["striker", "escort", "defender"]
+	var offsets := [Vector2.ZERO, Vector2(-25, -78), Vector2(-25, 78)] if team == "cat" else [Vector2.ZERO, Vector2(25, -78), Vector2(25, 78)]
+	for i in range(keys.size()):
+		var pet := PetScript.new()
+		var controlled := team == player_team and i == 0
+		pet.setup(_pet_data(keys[i]), team, controlled, roles[i], self)
+		pet.home_base = bases[team]
+		pet.target_base = bases[_other_team(team)]
+		pet.global_position = center + offsets[i]
+		add_child(pet)
+		pets.append(pet)
+		if controlled:
+			player_pet = pet
+
+
+func _create_hud() -> void:
+	hud_layer = CanvasLayer.new()
+	add_child(hud_layer)
+
+	score_label = Label.new()
+	score_label.position = Vector2(424, 14)
+	score_label.size = Vector2(432, 34)
+	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	score_label.add_theme_font_size_override("font_size", 24)
+	score_label.add_theme_color_override("font_color", Color(0.15, 0.09, 0.06))
+	hud_layer.add_child(score_label)
+
+	status_label = Label.new()
+	status_label.position = Vector2(24, 674)
+	status_label.size = Vector2(1230, 32)
+	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_label.add_theme_font_size_override("font_size", 16)
+	status_label.add_theme_color_override("font_color", Color(0.21, 0.14, 0.10))
+	hud_layer.add_child(status_label)
+
+	cooldown_label = Label.new()
+	cooldown_label.position = Vector2(20, 16)
+	cooldown_label.size = Vector2(360, 92)
+	cooldown_label.add_theme_font_size_override("font_size", 16)
+	cooldown_label.add_theme_color_override("font_color", Color(0.20, 0.13, 0.09))
+	hud_layer.add_child(cooldown_label)
+
+	result_panel = Panel.new()
+	result_panel.visible = false
+	result_panel.position = Vector2(430, 250)
+	result_panel.size = Vector2(420, 190)
+	hud_layer.add_child(result_panel)
+
+	result_label = Label.new()
+	result_label.position = Vector2(20, 24)
+	result_label.size = Vector2(380, 142)
+	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	result_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	result_label.add_theme_font_size_override("font_size", 24)
+	result_panel.add_child(result_label)
+
+
+func _handle_player_input() -> void:
+	if player_pet == null or player_pet.defeated:
+		return
+	var dir := Vector2.ZERO
+	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
+		dir.y -= 1.0
+	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
+		dir.y += 1.0
+	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
+		dir.x -= 1.0
+	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
+		dir.x += 1.0
+	player_pet.desired_move = dir
+
+	var mouse_dir := get_global_mouse_position() - player_pet.global_position
+	if mouse_dir.length() > 8.0:
+		player_pet.aim_direction = mouse_dir.normalized()
+	elif dir.length() > 0.1:
+		player_pet.aim_direction = dir.normalized()
+
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_key_pressed(KEY_J):
+		player_pet.try_attack()
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or Input.is_key_pressed(KEY_K):
+		player_pet.try_skill()
+	if Input.is_key_pressed(KEY_E):
+		player_pet.drop_or_throw_carried()
+
+
+func _drive_ai(pet: Node, delta: float) -> void:
+	if pet.defeated:
+		return
+	pet.ai_think_timer -= delta
+	if pet.ai_think_timer <= 0.0:
+		pet.ai_think_timer = rng.randf_range(0.12, 0.28)
+		pet.ai_target_position = _choose_ai_target(pet)
+
+	var to_target := pet.ai_target_position - pet.global_position
+	pet.desired_move = to_target.normalized() if to_target.length() > 20.0 else Vector2.ZERO
+	if pet.desired_move.length() > 0.1:
+		pet.aim_direction = pet.desired_move
+
+	var enemy := _nearest_enemy_pet(pet.global_position, pet.team, 210.0)
+	if enemy != null:
+		pet.aim_direction = (enemy.global_position - pet.global_position).normalized()
+		if pet.global_position.distance_to(enemy.global_position) <= pet.attack_range:
+			pet.try_attack()
+		if pet.skill_timer <= 0.0 and _should_ai_skill(pet, enemy):
+			pet.try_skill()
+
+	if pet.carried_item != null and pet.carried_item.kind == "sock" and enemy != null and pet.global_position.distance_to(enemy.global_position) < 280.0:
+		pet.aim_direction = (enemy.global_position - pet.global_position).normalized()
+		pet.drop_or_throw_carried()
+
+
+func _choose_ai_target(pet: Node) -> Vector2:
+	if pet.carried_item != null:
+		if pet.carried_item.kind == "boom":
+			return bases[_other_team(pet.team)].global_position
+		if pet.carried_item.kind == "repair":
+			return bases[pet.team].global_position
+		if pet.carried_item.kind == "sock":
+			var carrier := _find_enemy_carrier(pet.team)
+			if carrier != null:
+				return carrier.global_position
+
+	var enemy_carrier := _find_enemy_carrier(pet.team)
+	if enemy_carrier != null:
+		var danger_distance := enemy_carrier.global_position.distance_to(bases[pet.team].global_position)
+		if pet.role == "defender" or danger_distance < 470.0:
+			return enemy_carrier.global_position
+
+	var allied_carrier := _find_allied_carrier(pet.team)
+	if allied_carrier != null and pet.role == "escort":
+		return allied_carrier.global_position + (allied_carrier.target_base.global_position - allied_carrier.global_position).normalized() * 45.0
+
+	if pet.role == "defender":
+		var repair := _closest_free_item(bases[pet.team].global_position, ["repair"])
+		if bases[pet.team].durability <= 3 and repair != null:
+			return repair.global_position
+		return bases[pet.team].global_position + Vector2(115, 0) * (1 if pet.team == "cat" else -1)
+
+	var boom := _closest_free_item(pet.global_position, ["boom"])
+	if boom != null:
+		return boom.global_position
+
+	var useful := _closest_free_item(pet.global_position, ["shield", "speed", "sock", "repair"])
+	if useful != null:
+		return useful.global_position
+
+	var nearest_enemy := _nearest_enemy_pet(pet.global_position, pet.team, 9999.0)
+	if nearest_enemy != null:
+		return nearest_enemy.global_position
+	return Vector2(640, 360)
+
+
+func _should_ai_skill(pet: Node, enemy: Node) -> bool:
+	if pet.skill_type == "shield":
+		return pet.carried_item != null or pet.global_position.distance_to(enemy.global_position) < 75.0
+	if pet.skill_type == "pulse":
+		return pet.global_position.distance_to(enemy.global_position) < 110.0
+	if pet.skill_type == "sprint":
+		return pet.carried_item != null or pet.global_position.distance_to(enemy.global_position) > 120.0
+	return pet.global_position.distance_to(enemy.global_position) > 55.0
+
+
+func pet_attack(attacker: Node) -> bool:
+	var target := _nearest_enemy_pet(attacker.global_position, attacker.team, attacker.attack_range)
+	if target != null:
+		var dir := (target.global_position - attacker.global_position).normalized()
+		target.take_damage(attacker.attack_damage, dir * 330.0, attacker)
+		return true
+
+	var item := _nearest_free_item(attacker.global_position, attacker.attack_range + 8.0)
+	if item != null:
+		var dir := attacker.aim_direction.normalized()
+		if dir.length() < 0.1:
+			dir = (item.global_position - attacker.global_position).normalized()
+		item.kick(dir, 610.0)
+		return true
+	return false
+
+
+func area_burst(source: Node, radius: float, damage: float, knock_force: float) -> void:
+	for target in pets:
+		if target.team == source.team or target.defeated:
+			continue
+		var distance := source.global_position.distance_to(target.global_position)
+		if distance <= radius:
+			var dir := (target.global_position - source.global_position).normalized()
+			target.take_damage(damage, dir * knock_force, source)
+	for item in items:
+		if item.held_by == null and source.global_position.distance_to(item.global_position) <= radius:
+			item.kick((item.global_position - source.global_position).normalized(), knock_force + 180.0)
+
+
+func _process_dash_hits() -> void:
+	for pet in pets:
+		if pet.defeated or pet.dash_timer <= 0.0:
+			continue
+		for target in pets:
+			if target.team == pet.team or target.defeated or pet.dash_hit_targets.has(target):
+				continue
+			if pet.global_position.distance_to(target.global_position) <= 52.0:
+				pet.dash_hit_targets.append(target)
+				var dir := (target.global_position - pet.global_position).normalized()
+				target.take_damage(20.0, dir * 520.0, pet)
+		for item in items:
+			if item.held_by == null and pet.global_position.distance_to(item.global_position) <= 50.0:
+				item.kick(pet.aim_direction, 780.0)
+
+
+func _process_sock_hits() -> void:
+	for item in items.duplicate():
+		if item.kind != "sock" or item.projectile_time <= 0.0:
+			continue
+		for pet in pets:
+			if pet.team == item.thrown_by_team or pet.defeated:
+				continue
+			if pet.global_position.distance_to(item.global_position) <= 34.0:
+				var dir := (pet.global_position - item.global_position).normalized()
+				pet.take_damage(5.0, dir * 260.0, null)
+				pet.add_slow(2.2)
+				_consume_item(item)
+				break
+
+
+func _process_item_pickups() -> void:
+	for pet in pets:
+		if pet.defeated or pet.carried_item != null:
+			continue
+		var closest := _nearest_free_item(pet.global_position, 36.0)
+		if closest != null and closest.can_pick_up():
+			var was_carry_item := closest.is_carry_item()
+			closest.pickup(pet)
+			if not was_carry_item:
+				items.erase(closest)
+
+
+func _process_deliveries() -> void:
+	for pet in pets:
+		if pet.defeated or pet.carried_item == null:
+			continue
+		var carried := pet.carried_item
+		var home_base: BattleBase = bases[pet.team]
+		var enemy_base: BattleBase = bases[_other_team(pet.team)]
+		if carried.kind == "boom" and enemy_base.contains_point(pet.global_position):
+			enemy_base.damage(1)
+			_consume_item(carried)
+			boom_respawn_timer = 2.0
+		elif carried.kind == "repair" and home_base.contains_point(pet.global_position):
+			if home_base.repair(1):
+				_consume_item(carried)
+
+
+func _process_item_bounds() -> void:
+	for item in items:
+		if item.held_by == null:
+			item.global_position = clamp_to_map(item.global_position)
+
+
+func _tick_spawners(delta: float) -> void:
+	if boom_respawn_timer > 0.0:
+		boom_respawn_timer -= delta
+		if boom_respawn_timer <= 0.0 and _closest_free_item(Vector2(640, 360), ["boom"]) == null and _find_item_any("boom") == null:
+			_spawn_item("boom", Vector2(640, 360))
+
+	aux_spawn_timer -= delta
+	if aux_spawn_timer <= 0.0:
+		aux_spawn_timer = rng.randf_range(5.0, 8.0)
+		if _count_free_aux_items() < 5:
+			var kinds := ["repair", "speed", "shield", "sock"]
+			_spawn_item(kinds[rng.randi_range(0, kinds.size() - 1)], aux_spawn_points[rng.randi_range(0, aux_spawn_points.size() - 1)])
+
+
+func _spawn_item(kind: String, pos: Vector2) -> Node:
+	var item := ItemScript.new()
+	item.setup(kind, pos)
+	add_child(item)
+	items.append(item)
+	return item
+
+
+func _consume_item(item: Node) -> void:
+	if item == null:
+		return
+	if item.held_by != null and item.held_by.carried_item == item:
+		item.held_by.carried_item = null
+	items.erase(item)
+	item.queue_free()
+
+
+func _on_base_destroyed(base: BattleBase) -> void:
+	var winner := _other_team(base.team)
+	match_over = true
+	GameState.record_match(winner, bases["cat"].durability, bases["dog"].durability)
+	result_panel.visible = true
+	var result := "VICTORY" if winner == player_team else "DEFEAT"
+	result_label.text = "%s\n%s team wins\nPress Enter to return" % [result, winner.capitalize()]
+
+
+func update_hud() -> void:
+	if score_label == null:
+		return
+	score_label.text = "Cats %d / 5     Dogs %d / 5" % [bases["cat"].durability, bases["dog"].durability]
+	if player_pet != null:
+		var item_name := "None" if player_pet.carried_item == null else player_pet.carried_item.kind.capitalize()
+		cooldown_label.text = "HP %d/%d\nSkill %.1fs\nCarrying: %s\nCoins: %d" % [
+			int(ceil(player_pet.hp)),
+			int(ceil(player_pet.max_hp)),
+			player_pet.skill_timer,
+			item_name,
+			GameState.coins
+		]
+	status_label.text = "Boom Snack: enemy base -1   Repair Can: your base +1   Bell: speed   Shield: block one push   Sock: throw to slow"
+
+
+func clamp_to_map(point: Vector2) -> Vector2:
+	return Vector2(
+		clamp(point.x, MAP_RECT.position.x + 25.0, MAP_RECT.end.x - 25.0),
+		clamp(point.y, MAP_RECT.position.y + 25.0, MAP_RECT.end.y - 25.0)
+	)
+
+
+func get_respawn_time(team: String) -> float:
+	var own_base: BattleBase = bases[team]
+	var other_base: BattleBase = bases[_other_team(team)]
+	if own_base.durability < other_base.durability:
+		return 2.2
+	return 3.0
+
+
+func _nearest_enemy_pet(origin: Vector2, team: String, max_distance: float) -> Node:
+	var best: Node = null
+	var best_distance := max_distance
+	for pet in pets:
+		if pet.team == team or pet.defeated:
+			continue
+		var distance := origin.distance_to(pet.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			best = pet
+	return best
+
+
+func _nearest_free_item(origin: Vector2, max_distance: float) -> Node:
+	var best: Node = null
+	var best_distance := max_distance
+	for item in items:
+		if item.held_by != null or not item.can_pick_up():
+			continue
+		var distance := origin.distance_to(item.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			best = item
+	return best
+
+
+func _closest_free_item(origin: Vector2, kinds: Array) -> Node:
+	var best: Node = null
+	var best_distance := 99999.0
+	for item in items:
+		if item.held_by != null or not item.can_pick_up() or not kinds.has(item.kind):
+			continue
+		var distance := origin.distance_to(item.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			best = item
+	return best
+
+
+func _find_item_any(kind: String) -> Node:
+	for item in items:
+		if item.kind == kind:
+			return item
+	return null
+
+
+func _count_free_aux_items() -> int:
+	var count := 0
+	for item in items:
+		if item.kind != "boom" and item.held_by == null:
+			count += 1
+	return count
+
+
+func _find_enemy_carrier(team: String) -> Node:
+	for pet in pets:
+		if pet.team == team or pet.defeated or pet.carried_item == null:
+			continue
+		if pet.carried_item.kind == "boom":
+			return pet
+	return null
+
+
+func _find_allied_carrier(team: String) -> Node:
+	for pet in pets:
+		if pet.team != team or pet.defeated or pet.carried_item == null:
+			continue
+		if pet.carried_item.kind == "boom":
+			return pet
+	return null
+
+
+func _other_team(team: String) -> String:
+	return "dog" if team == "cat" else "cat"
+
+
+func _pet_data(key: String) -> Dictionary:
+	var all := {
+		"orange_cat": {
+			"key": "orange_cat",
+			"name": "Orange",
+			"body_color": Color(1.0, 0.54, 0.23),
+			"accent_color": Color(1.0, 0.82, 0.32),
+			"hp": 120.0,
+			"speed": 235.0,
+			"attack_damage": 18.0,
+			"attack_range": 62.0,
+			"attack_cooldown": 0.56,
+			"skill_type": "dash",
+			"skill_cooldown": 4.8,
+		},
+		"calico_cat": {
+			"key": "calico_cat",
+			"name": "Calico",
+			"body_color": Color(1.0, 0.78, 0.52),
+			"accent_color": Color(0.37, 0.22, 0.16),
+			"hp": 96.0,
+			"speed": 290.0,
+			"attack_damage": 15.0,
+			"attack_range": 58.0,
+			"attack_cooldown": 0.45,
+			"skill_type": "sprint",
+			"skill_cooldown": 5.0,
+		},
+		"ragdoll_cat": {
+			"key": "ragdoll_cat",
+			"name": "Ragdoll",
+			"body_color": Color(0.78, 0.86, 1.0),
+			"accent_color": Color(0.43, 0.36, 0.56),
+			"hp": 106.0,
+			"speed": 240.0,
+			"attack_damage": 13.0,
+			"attack_range": 86.0,
+			"attack_cooldown": 0.64,
+			"skill_type": "pulse",
+			"skill_cooldown": 5.8,
+		},
+		"shiba_dog": {
+			"key": "shiba_dog",
+			"name": "Shiba",
+			"body_color": Color(0.94, 0.43, 0.18),
+			"accent_color": Color(1.0, 0.89, 0.66),
+			"hp": 112.0,
+			"speed": 255.0,
+			"attack_damage": 18.0,
+			"attack_range": 64.0,
+			"attack_cooldown": 0.54,
+			"skill_type": "dash",
+			"skill_cooldown": 4.6,
+		},
+		"corgi_dog": {
+			"key": "corgi_dog",
+			"name": "Corgi",
+			"body_color": Color(0.95, 0.67, 0.28),
+			"accent_color": Color(0.98, 0.92, 0.78),
+			"hp": 135.0,
+			"speed": 220.0,
+			"attack_damage": 16.0,
+			"attack_range": 58.0,
+			"attack_cooldown": 0.58,
+			"skill_type": "shield",
+			"skill_cooldown": 6.2,
+		},
+		"husky_dog": {
+			"key": "husky_dog",
+			"name": "Husky",
+			"body_color": Color(0.52, 0.65, 0.77),
+			"accent_color": Color(0.94, 0.97, 1.0),
+			"hp": 100.0,
+			"speed": 286.0,
+			"attack_damage": 14.0,
+			"attack_range": 64.0,
+			"attack_cooldown": 0.43,
+			"skill_type": "sprint",
+			"skill_cooldown": 5.1,
+		},
+	}
+	return all[key]
