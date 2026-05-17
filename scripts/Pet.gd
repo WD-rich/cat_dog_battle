@@ -4,6 +4,8 @@ class_name BattlePet
 signal knocked_out(pet: BattlePet)
 signal respawned(pet: BattlePet)
 
+const UI_FONT := preload("res://assets/fonts/NotoSansCJKsc-Regular.otf")
+
 var battle: Node = null
 var pet_key := "orange_cat"
 var display_name := "Pet"
@@ -106,6 +108,7 @@ func _ready() -> void:
 	_name_label = Label.new()
 	_name_label.text = display_name
 	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_name_label.add_theme_font_override("font", UI_FONT)
 	_name_label.add_theme_font_size_override("font_size", 12)
 	_name_label.add_theme_color_override("font_color", Color(0.13, 0.09, 0.07))
 	_name_label.position = Vector2(-58, -64)
@@ -193,6 +196,8 @@ func take_damage(amount: float, impulse: Vector2, source: Node = null) -> void:
 		final_damage *= 0.35
 		impulse_scale = 0.35
 	hp -= final_damage
+	if battle != null and battle.has_method("show_hit_feedback") and final_damage >= 1.0:
+		battle.show_hit_feedback(global_position, int(ceil(final_damage)), team)
 	knock_velocity += impulse * impulse_scale
 	if carried_item != null and shield_timer <= 0.0:
 		carried_item.drop(global_position + impulse.normalized() * 24.0)
@@ -224,7 +229,7 @@ func drop_or_throw_carried() -> void:
 	if carried_item.kind == "sock":
 		carried_item.throw_from(self, aim_direction)
 	else:
-		carried_item.drop(global_position + aim_direction.normalized() * 36.0, 0.7)
+		carried_item.drop(global_position + aim_direction.normalized() * 54.0, 1.2)
 
 
 func _knock_out() -> void:
@@ -251,8 +256,8 @@ func _respawn() -> void:
 func _update_label() -> void:
 	if _name_label == null:
 		return
-	var prefix := "P " if is_player else ""
-	var suffix := " Lv.%d" % level if is_player else ""
+	var prefix := "你·" if is_player else ""
+	var suffix := " %d级" % level if is_player else ""
 	_name_label.text = prefix + display_name + suffix
 
 
@@ -289,11 +294,21 @@ func _draw() -> void:
 	if is_player:
 		draw_circle(Vector2.ZERO, 35, Color(1.0, 0.95, 0.30, 0.32), false, 4.0)
 
+	if carried_item != null and carried_item.kind == "boom":
+		var pulse := 1.0 + sin(Time.get_ticks_msec() / 110.0) * 0.10
+		draw_circle(Vector2(0, -8), 43.0 * pulse, Color(1.0, 0.64, 0.10, 0.22), false, 7.0)
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(0, -76),
+			Vector2(-15, -52),
+			Vector2(15, -52),
+		]), Color(1.0, 0.42, 0.12, 0.82))
+		draw_polyline(PackedVector2Array([Vector2(0, -76), Vector2(-15, -52), Vector2(15, -52), Vector2(0, -76)]), Color(0.22, 0.13, 0.08), 3.0)
+
 	if shield_timer > 0.0:
 		draw_circle(Vector2.ZERO, 38, Color(0.40, 0.70, 1.0, 0.28), false, 5.0)
 
 	var bar_width := 58.0
-	var hp_ratio := clamp(hp / max_hp, 0.0, 1.0)
+	var hp_ratio: float = clamp(hp / max_hp, 0.0, 1.0)
 	_draw_filled_rect(Rect2(Vector2(-bar_width / 2.0, -54), Vector2(bar_width, 7)), Color(0.18, 0.11, 0.09, 0.85))
 	_draw_filled_rect(Rect2(Vector2(-bar_width / 2.0 + 1, -53), Vector2((bar_width - 2) * hp_ratio, 5)), Color(0.30, 0.95, 0.38))
 

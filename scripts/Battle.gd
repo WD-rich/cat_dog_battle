@@ -5,12 +5,14 @@ const BaseScript := preload("res://scripts/Base.gd")
 const ItemScript := preload("res://scripts/Item.gd")
 const GameDataScript := preload("res://scripts/GameData.gd")
 const ARENA_TEXTURE := preload("res://assets/visuals/arena_living_room.svg")
+const UI_FONT := preload("res://assets/fonts/NotoSansCJKsc-Regular.otf")
 
 const WORLD_SIZE := Vector2(2200, 1240)
 const MAP_RECT := Rect2(60, 110, 2080, 1000)
 const CENTER_POS := Vector2(1100, 620)
 const CAT_BASE_POS := Vector2(180, 620)
 const DOG_BASE_POS := Vector2(2020, 620)
+const OPENING_GRACE_SECONDS := 4.0
 
 var pets: Array = []
 var items: Array = []
@@ -54,6 +56,7 @@ var event_label: Label
 var touch_controls: Control
 var result_panel: Panel
 var result_label: Label
+var guide_label: Label
 
 var touch_up_held := false
 var touch_down_held := false
@@ -63,6 +66,7 @@ var touch_attack_held := false
 var touch_skill_held := false
 var touch_drop_requested := false
 var touch_move := Vector2.ZERO
+var drop_input_was_down := false
 
 
 func _ready() -> void:
@@ -76,11 +80,11 @@ func _ready() -> void:
 	_create_camera()
 	_create_hud()
 	_spawn_item("boom", CENTER_POS)
-	_spawn_item("repair", Vector2(520, 620))
+	_spawn_item("repair", Vector2(360, 330))
 	_spawn_item("shield", Vector2(1100, 940))
 	_spawn_item("speed", Vector2(1100, 300))
 	_spawn_item("sock", Vector2(1680, 620))
-	_show_event("Grab the Boom Snack and invade the enemy base.")
+	_show_event("开局保护 4 秒，先冲中场抢炸弹！")
 	update_hud()
 
 
@@ -109,6 +113,7 @@ func _physics_process(delta: float) -> void:
 	_process_deliveries()
 	_process_item_bounds()
 	_tick_spawners(delta)
+	queue_redraw()
 	update_hud()
 
 
@@ -129,6 +134,7 @@ func _draw() -> void:
 			_draw_filled_rect(rect, Color(0.64, 0.40, 0.28))
 			draw_rect(rect, Color(0.24, 0.14, 0.09), false, 4.0)
 			draw_line(rect.position + Vector2(8, 8), rect.position + rect.size - Vector2(8, 8), Color(0.78, 0.55, 0.38), 2.0)
+	_draw_battle_guides()
 
 
 func _create_map() -> void:
@@ -161,12 +167,29 @@ func _create_bases() -> void:
 	cat_base.destroyed.connect(_on_base_destroyed)
 	add_child(cat_base)
 	bases["cat"] = cat_base
+	_add_base_label("猫窝", CAT_BASE_POS + Vector2(0, -132), Color(0.95, 0.30, 0.18))
 
 	var dog_base := BaseScript.new()
 	dog_base.setup("dog", DOG_BASE_POS)
 	dog_base.destroyed.connect(_on_base_destroyed)
 	add_child(dog_base)
 	bases["dog"] = dog_base
+	_add_base_label("狗窝", DOG_BASE_POS + Vector2(0, -132), Color(0.14, 0.42, 0.86))
+
+
+func _add_base_label(text: String, pos: Vector2, color: Color) -> void:
+	var label := Label.new()
+	label.text = text
+	label.position = pos + Vector2(-64, 0)
+	label.size = Vector2(128, 32)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.z_index = 30
+	label.add_theme_font_override("font", UI_FONT)
+	label.add_theme_font_size_override("font_size", 26)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color(1.0, 0.95, 0.76, 0.96))
+	label.add_theme_constant_override("outline_size", 6)
+	add_child(label)
 
 
 func _create_pets() -> void:
@@ -227,21 +250,35 @@ func _create_hud() -> void:
 	hud_layer = CanvasLayer.new()
 	add_child(hud_layer)
 
+	var top_back := ColorRect.new()
+	top_back.position = Vector2(12, 8)
+	top_back.size = Vector2(1256, 72)
+	top_back.color = Color(1.0, 0.95, 0.76, 0.72)
+	hud_layer.add_child(top_back)
+
 	score_label = Label.new()
 	score_label.position = Vector2(424, 14)
 	score_label.size = Vector2(432, 34)
 	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	score_label.add_theme_font_override("font", UI_FONT)
 	score_label.add_theme_font_size_override("font_size", 24)
 	score_label.add_theme_color_override("font_color", Color(0.15, 0.09, 0.06))
 	score_label.add_theme_color_override("font_outline_color", Color(0.99, 0.91, 0.72, 0.86))
 	score_label.add_theme_constant_override("outline_size", 4)
 	hud_layer.add_child(score_label)
 
+	var status_back := ColorRect.new()
+	status_back.position = Vector2(22, 660)
+	status_back.size = Vector2(1236, 38)
+	status_back.color = Color(1.0, 0.94, 0.72, 0.72)
+	hud_layer.add_child(status_back)
+
 	status_label = Label.new()
-	status_label.position = Vector2(24, 674)
-	status_label.size = Vector2(1230, 32)
+	status_label.position = Vector2(34, 665)
+	status_label.size = Vector2(1212, 30)
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	status_label.add_theme_font_size_override("font_size", 16)
+	status_label.add_theme_font_override("font", UI_FONT)
+	status_label.add_theme_font_size_override("font_size", 18)
 	status_label.add_theme_color_override("font_color", Color(0.21, 0.14, 0.10))
 	status_label.add_theme_color_override("font_outline_color", Color(0.99, 0.91, 0.72, 0.86))
 	status_label.add_theme_constant_override("outline_size", 4)
@@ -250,6 +287,7 @@ func _create_hud() -> void:
 	cooldown_label = Label.new()
 	cooldown_label.position = Vector2(20, 18)
 	cooldown_label.size = Vector2(390, 28)
+	cooldown_label.add_theme_font_override("font", UI_FONT)
 	cooldown_label.add_theme_font_size_override("font_size", 16)
 	cooldown_label.add_theme_color_override("font_color", Color(0.20, 0.13, 0.09))
 	cooldown_label.add_theme_color_override("font_outline_color", Color(0.99, 0.91, 0.72, 0.86))
@@ -260,6 +298,7 @@ func _create_hud() -> void:
 	objective_label.position = Vector2(390, 43)
 	objective_label.size = Vector2(500, 30)
 	objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	objective_label.add_theme_font_override("font", UI_FONT)
 	objective_label.add_theme_font_size_override("font_size", 14)
 	objective_label.add_theme_color_override("font_color", Color(0.20, 0.13, 0.09))
 	objective_label.add_theme_color_override("font_outline_color", Color(0.99, 0.91, 0.72, 0.86))
@@ -270,11 +309,23 @@ func _create_hud() -> void:
 	event_label.position = Vector2(390, 88)
 	event_label.size = Vector2(500, 42)
 	event_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	event_label.add_theme_font_override("font", UI_FONT)
 	event_label.add_theme_font_size_override("font_size", 20)
 	event_label.add_theme_color_override("font_color", Color(0.80, 0.18, 0.10))
 	event_label.add_theme_color_override("font_outline_color", Color(0.99, 0.91, 0.72, 0.92))
 	event_label.add_theme_constant_override("outline_size", 5)
 	hud_layer.add_child(event_label)
+
+	guide_label = Label.new()
+	guide_label.position = Vector2(910, 82)
+	guide_label.size = Vector2(330, 34)
+	guide_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	guide_label.add_theme_font_override("font", UI_FONT)
+	guide_label.add_theme_font_size_override("font_size", 20)
+	guide_label.add_theme_color_override("font_color", Color(0.18, 0.11, 0.08))
+	guide_label.add_theme_color_override("font_outline_color", Color(1.0, 0.93, 0.73, 0.95))
+	guide_label.add_theme_constant_override("outline_size", 5)
+	hud_layer.add_child(guide_label)
 
 	_create_touch_controls()
 
@@ -289,6 +340,7 @@ func _create_hud() -> void:
 	result_label.size = Vector2(380, 142)
 	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	result_label.add_theme_font_override("font", UI_FONT)
 	result_label.add_theme_font_size_override("font_size", 24)
 	result_panel.add_child(result_label)
 
@@ -318,9 +370,13 @@ func _handle_player_input() -> void:
 		player_pet.try_attack()
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or Input.is_key_pressed(KEY_K) or touch_skill_held:
 		player_pet.try_skill()
-	if Input.is_key_pressed(KEY_E) or touch_drop_requested:
+	var drop_down := Input.is_key_pressed(KEY_E) or touch_drop_requested
+	if drop_down and not drop_input_was_down:
 		player_pet.drop_or_throw_carried()
+		if player_pet.carried_item == null:
+			_show_event("已丢下道具")
 		touch_drop_requested = false
+	drop_input_was_down = drop_down
 
 
 func _drive_ai(pet: Node, delta: float) -> void:
@@ -339,9 +395,10 @@ func _drive_ai(pet: Node, delta: float) -> void:
 	var enemy := _nearest_enemy_pet(pet.global_position, pet.team, 210.0)
 	if enemy != null:
 		pet.aim_direction = (enemy.global_position - pet.global_position).normalized()
-		if pet.global_position.distance_to(enemy.global_position) <= pet.attack_range:
+		var can_attack_enemy := not _is_opening_protected(pet, enemy)
+		if can_attack_enemy and pet.global_position.distance_to(enemy.global_position) <= pet.attack_range:
 			pet.try_attack()
-		if pet.skill_timer <= 0.0 and _should_ai_skill(pet, enemy):
+		if can_attack_enemy and pet.skill_timer <= 0.0 and _should_ai_skill(pet, enemy):
 			pet.try_skill()
 
 	if pet.carried_item != null and pet.carried_item.kind == "sock" and enemy != null and pet.global_position.distance_to(enemy.global_position) < 280.0:
@@ -350,6 +407,12 @@ func _drive_ai(pet: Node, delta: float) -> void:
 
 
 func _choose_ai_target(pet: Node) -> Vector2:
+	if elapsed < OPENING_GRACE_SECONDS and pet.team != player_team:
+		var early_boom := _closest_free_item(pet.global_position, ["boom"])
+		if early_boom != null:
+			return early_boom.global_position
+		return CENTER_POS + Vector2(150, -120) * (1 if pet.team == "cat" else -1)
+
 	if pet.carried_item != null:
 		if pet.carried_item.kind == "boom":
 			return bases[_other_team(pet.team)].global_position
@@ -402,7 +465,7 @@ func _should_ai_skill(pet: Node, enemy: Node) -> bool:
 
 func pet_attack(attacker: Node) -> bool:
 	var target := _nearest_enemy_pet(attacker.global_position, attacker.team, attacker.attack_range)
-	if target != null:
+	if target != null and not _is_opening_protected(attacker, target):
 		var dir = (target.global_position - attacker.global_position).normalized()
 		target.take_damage(attacker.attack_damage, dir * 330.0, attacker)
 		return true
@@ -421,6 +484,8 @@ func area_burst(source: Node, radius: float, damage: float, knock_force: float) 
 	for target in pets:
 		if target.team == source.team or target.defeated:
 			continue
+		if _is_opening_protected(source, target):
+			continue
 		var distance = source.global_position.distance_to(target.global_position)
 		if distance <= radius:
 			var dir = (target.global_position - source.global_position).normalized()
@@ -436,6 +501,8 @@ func _process_dash_hits() -> void:
 			continue
 		for target in pets:
 			if target.team == pet.team or target.defeated or pet.dash_hit_targets.has(target):
+				continue
+			if _is_opening_protected(pet, target):
 				continue
 			if pet.global_position.distance_to(target.global_position) <= 52.0:
 				pet.dash_hit_targets.append(target)
@@ -453,6 +520,8 @@ func _process_sock_hits() -> void:
 		for pet in pets:
 			if pet.team == item.thrown_by_team or pet.defeated:
 				continue
+			if elapsed < OPENING_GRACE_SECONDS and pet == player_pet:
+				continue
 			if pet.global_position.distance_to(item.global_position) <= 34.0:
 				var dir = (pet.global_position - item.global_position).normalized()
 				pet.take_damage(5.0, dir * 260.0, null)
@@ -463,12 +532,24 @@ func _process_sock_hits() -> void:
 
 func _process_item_pickups() -> void:
 	for pet in pets:
-		if pet.defeated or pet.carried_item != null:
+		if pet.defeated:
 			continue
-		var closest := _nearest_free_item(pet.global_position, 36.0)
-		if closest != null and closest.can_pick_up():
+		if pet.carried_item != null:
+			if pet.carried_item.kind != "boom":
+				var nearby_boom := _closest_pickup_item(pet, ["boom"], 44.0)
+				if nearby_boom != null:
+					pet.carried_item.drop(pet.global_position - pet.aim_direction.normalized() * 42.0, 1.2)
+					nearby_boom.pickup(pet)
+					_show_event("%s 抢到炸弹！" % pet.display_name)
+			continue
+		var closest := _best_pickup_item(pet, 42.0)
+		if closest != null:
 			var was_carry_item = closest.is_carry_item()
-			closest.pickup(pet)
+			if closest.pickup(pet):
+				if closest.kind == "boom":
+					_show_event("%s 抢到炸弹，去炸%s！" % [pet.display_name, _base_name(_other_team(pet.team))])
+				elif closest.kind == "repair":
+					_show_event("%s 捡到修理罐，回窝可回血。" % pet.display_name)
 			if not was_carry_item:
 				items.erase(closest)
 
@@ -482,12 +563,13 @@ func _process_deliveries() -> void:
 		var enemy_base: BattleBase = bases[_other_team(pet.team)]
 		if carried.kind == "boom" and enemy_base.contains_point(pet.global_position):
 			enemy_base.damage(1)
-			_show_event("%s damaged the %s base." % [pet.display_name, enemy_base.team.capitalize()])
+			_show_base_burst(enemy_base.global_position, enemy_base.team)
+			_show_event("%s 炸了%s！" % [pet.display_name, _base_name(enemy_base.team)])
 			_consume_item(carried)
 			boom_respawn_timer = 2.0
 		elif carried.kind == "repair" and home_base.contains_point(pet.global_position):
 			if home_base.repair(1):
-				_show_event("%s repaired the %s base." % [pet.display_name, home_base.team.capitalize()])
+				_show_event("%s 修好了%s。" % [pet.display_name, _base_name(home_base.team)])
 				_consume_item(carried)
 
 
@@ -502,7 +584,7 @@ func _tick_spawners(delta: float) -> void:
 		boom_respawn_timer -= delta
 		if boom_respawn_timer <= 0.0 and _closest_free_item(CENTER_POS, ["boom"]) == null and _find_item_any("boom") == null:
 			_spawn_item("boom", CENTER_POS)
-			_show_event("Boom Snack respawned in the center.")
+			_show_event("炸弹回到中场了！")
 
 	aux_spawn_timer -= delta
 	if aux_spawn_timer <= 0.0:
@@ -531,16 +613,16 @@ func _consume_item(item: Node) -> void:
 
 func _on_base_destroyed(base: BattleBase) -> void:
 	var winner := _other_team(base.team)
-	_finish_match(winner, "%s base destroyed" % base.team.capitalize())
+	_finish_match(winner, "%s被拆掉" % _base_name(base.team))
 
 
 func _finish_by_time() -> void:
 	if bases["cat"].durability > bases["dog"].durability:
-		_finish_match("cat", "Time up")
+		_finish_match("cat", "时间到")
 	elif bases["dog"].durability > bases["cat"].durability:
-		_finish_match("dog", "Time up")
+		_finish_match("dog", "时间到")
 	else:
-		_finish_match("draw", "Time up")
+		_finish_match("draw", "时间到")
 
 
 func _finish_match(winner: String, reason: String) -> void:
@@ -549,41 +631,165 @@ func _finish_match(winner: String, reason: String) -> void:
 	match_over = true
 	var reward := GameState.record_match(winner, bases["cat"].durability, bases["dog"].durability, elapsed)
 	result_panel.visible = true
-	var result := "DRAW"
+	var result := "平局"
 	if winner == player_team:
-		result = "VICTORY"
+		result = "胜利"
 	elif winner != "draw":
-		result = "DEFEAT"
-	result_label.text = "%s\n%s\nReward +%d coins\nPress Enter to prep" % [result, reason, reward]
+		result = "失败"
+	result_label.text = "%s\n%s\n奖励 +%d 小鱼干\n按回车回准备页" % [result, reason, reward]
 
 
 func update_hud() -> void:
 	if score_label == null:
 		return
 	var time_seconds := int(match_time_left)
-	score_label.text = "Cats %d / 5     Dogs %d / 5     %02d:%02d" % [
+	score_label.text = "猫窝 %d/5    狗窝 %d/5    %02d:%02d" % [
 		bases["cat"].durability,
 		bases["dog"].durability,
 		int(time_seconds / 60.0),
 		time_seconds % 60
 	]
 	if player_pet != null:
-		var item_name = "None" if player_pet.carried_item == null else player_pet.carried_item.kind.capitalize()
-		cooldown_label.text = "HP %d/%d   Skill %.1fs   Item %s   Coins %d" % [
+		var item_name = "无" if player_pet.carried_item == null else _item_name(player_pet.carried_item.kind)
+		cooldown_label.text = "血量 %d/%d   技能 %.1fs   道具 %s   小鱼干 %d" % [
 			int(ceil(player_pet.hp)),
 			int(ceil(player_pet.max_hp)),
 			player_pet.skill_timer,
 			item_name,
 			GameState.coins
 		]
-	objective_label.text = "Carry Boom Snack to enemy base. Stop enemies carrying it to yours."
+	if elapsed < OPENING_GRACE_SECONDS:
+		var grace_left := int(ceil(OPENING_GRACE_SECONDS - elapsed))
+		objective_label.text = "开局保护 %d 秒：冲向中场抢炸弹" % grace_left
+	else:
+		objective_label.text = "带炸弹进敌方窝，别让对面炸你家"
 	event_label.text = last_event if event_timer > 0.0 else ""
-	status_label.text = "Boom: damage enemy base   Repair: restore your base   Bell: speed   Shield: escort   Sock: throw to slow"
+	status_label.text = "炸弹拆窝｜修理罐回血｜铃铛加速｜盾牌护送｜袜子丢出减速"
+	if guide_label != null:
+		guide_label.text = _guide_text()
 
 
 func _show_event(message: String) -> void:
 	last_event = message
 	event_timer = 2.8
+
+
+func _guide_text() -> String:
+	if player_pet == null:
+		return ""
+	var target: Vector2 = CENTER_POS
+	var verb := "抢炸弹"
+	var carrier := _find_enemy_carrier(player_team)
+	if player_pet.carried_item != null and player_pet.carried_item.kind == "boom":
+		target = bases[enemy_team].global_position
+		verb = "去炸%s" % _base_name(enemy_team)
+	elif carrier != null:
+		target = carrier.global_position
+		verb = "拦截炸弹"
+	else:
+		var boom := _find_item_any("boom")
+		if boom != null:
+			target = boom.global_position
+	var dir: Vector2 = target - player_pet.global_position
+	var arrow := "→"
+	if abs(dir.y) > abs(dir.x):
+		arrow = "↓" if dir.y > 0.0 else "↑"
+	else:
+		arrow = "→" if dir.x >= 0.0 else "←"
+	return "%s %s" % [arrow, verb]
+
+
+func _draw_battle_guides() -> void:
+	if player_pet == null or match_over:
+		return
+	var target: Vector2 = CENTER_POS
+	var guide_color := Color(1.0, 0.73, 0.20, 0.42)
+	var carrier := _find_enemy_carrier(player_team)
+	if player_pet.carried_item != null and player_pet.carried_item.kind == "boom":
+		target = bases[enemy_team].global_position
+		guide_color = Color(1.0, 0.38, 0.18, 0.46)
+	elif carrier != null:
+		target = carrier.global_position
+		guide_color = Color(0.95, 0.12, 0.10, 0.46)
+	else:
+		var boom := _find_item_any("boom")
+		if boom != null:
+			target = boom.global_position
+	var dir: Vector2 = target - player_pet.global_position
+	if dir.length() < 24.0:
+		return
+	dir = dir.normalized()
+	var start: Vector2 = player_pet.global_position + dir * 62.0
+	var finish: Vector2 = player_pet.global_position + dir * 170.0
+	draw_line(start, finish, guide_color, 9.0)
+	var side := Vector2(-dir.y, dir.x)
+	draw_colored_polygon(PackedVector2Array([
+		finish + dir * 24.0,
+		finish - dir * 18.0 + side * 18.0,
+		finish - dir * 18.0 - side * 18.0,
+	]), Color(guide_color.r, guide_color.g, guide_color.b, min(0.78, guide_color.a + 0.25)))
+
+
+func show_hit_feedback(pos: Vector2, amount: int, target_team: String) -> void:
+	var label := Label.new()
+	label.text = "-%d" % amount
+	label.z_index = 120
+	label.position = pos + Vector2(-18, -76)
+	label.size = Vector2(64, 28)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_override("font", UI_FONT)
+	label.add_theme_font_size_override("font_size", 20)
+	label.add_theme_color_override("font_color", Color(1.0, 0.28, 0.16) if target_team == "dog" else Color(0.15, 0.45, 1.0))
+	label.add_theme_color_override("font_outline_color", Color(1.0, 0.94, 0.74, 0.95))
+	label.add_theme_constant_override("outline_size", 4)
+	add_child(label)
+	var tween := create_tween()
+	tween.tween_property(label, "position", label.position + Vector2(0, -34), 0.45)
+	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.45)
+	tween.tween_callback(label.queue_free)
+
+
+func _show_base_burst(pos: Vector2, team: String) -> void:
+	var boom_color := Color(1.0, 0.38, 0.10) if team == "dog" else Color(0.12, 0.48, 1.0)
+	for i in range(3):
+		var ring := Line2D.new()
+		ring.closed = true
+		ring.width = 8.0 - i * 1.4
+		ring.default_color = Color(boom_color.r, boom_color.g, boom_color.b, 0.78 - i * 0.12)
+		ring.points = _circle_points(58.0 + i * 20.0, 32)
+		ring.position = pos
+		ring.z_index = 110
+		ring.scale = Vector2(0.28, 0.28)
+		add_child(ring)
+		var ring_tween := create_tween()
+		ring_tween.tween_property(ring, "scale", Vector2(1.0 + i * 0.18, 1.0 + i * 0.18), 0.34 + i * 0.08)
+		ring_tween.parallel().tween_property(ring, "modulate:a", 0.0, 0.34 + i * 0.08)
+		ring_tween.tween_callback(ring.queue_free)
+
+	var label := Label.new()
+	label.text = "砰！拆窝"
+	label.position = pos + Vector2(-84, -138)
+	label.size = Vector2(168, 42)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.z_index = 120
+	label.add_theme_font_override("font", UI_FONT)
+	label.add_theme_font_size_override("font_size", 28)
+	label.add_theme_color_override("font_color", boom_color)
+	label.add_theme_color_override("font_outline_color", Color(1.0, 0.95, 0.76, 0.96))
+	label.add_theme_constant_override("outline_size", 6)
+	add_child(label)
+	var label_tween := create_tween()
+	label_tween.tween_property(label, "position", label.position + Vector2(0, -44), 0.64)
+	label_tween.parallel().tween_property(label, "modulate:a", 0.0, 0.64)
+	label_tween.tween_callback(label.queue_free)
+
+
+func _circle_points(radius: float, steps: int) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for i in range(steps):
+		var angle := TAU * float(i) / float(steps)
+		points.append(Vector2(cos(angle), sin(angle)) * radius)
+	return points
 
 
 func _create_touch_controls() -> void:
@@ -593,28 +799,28 @@ func _create_touch_controls() -> void:
 	hud_layer.add_child(touch_controls)
 
 	var pad_size := Vector2(68, 52)
-	_add_touch_button("UP", Vector2(90, 500), pad_size, func() -> void:
+	_add_touch_button("上", Vector2(90, 500), pad_size, func() -> void:
 		touch_up_held = true
 		_update_touch_move()
 	, func() -> void:
 		touch_up_held = false
 		_update_touch_move()
 	)
-	_add_touch_button("DOWN", Vector2(90, 612), pad_size, func() -> void:
+	_add_touch_button("下", Vector2(90, 612), pad_size, func() -> void:
 		touch_down_held = true
 		_update_touch_move()
 	, func() -> void:
 		touch_down_held = false
 		_update_touch_move()
 	)
-	_add_touch_button("LEFT", Vector2(18, 556), pad_size, func() -> void:
+	_add_touch_button("左", Vector2(18, 556), pad_size, func() -> void:
 		touch_left_held = true
 		_update_touch_move()
 	, func() -> void:
 		touch_left_held = false
 		_update_touch_move()
 	)
-	_add_touch_button("RIGHT", Vector2(162, 556), pad_size, func() -> void:
+	_add_touch_button("右", Vector2(162, 556), pad_size, func() -> void:
 		touch_right_held = true
 		_update_touch_move()
 	, func() -> void:
@@ -622,17 +828,17 @@ func _create_touch_controls() -> void:
 		_update_touch_move()
 	)
 
-	_add_touch_button("ATK", Vector2(1054, 530), Vector2(82, 58), func() -> void:
+	_add_touch_button("打", Vector2(1054, 530), Vector2(82, 58), func() -> void:
 		touch_attack_held = true
 	, func() -> void:
 		touch_attack_held = false
 	)
-	_add_touch_button("SKL", Vector2(1150, 478), Vector2(82, 58), func() -> void:
+	_add_touch_button("技", Vector2(1150, 478), Vector2(82, 58), func() -> void:
 		touch_skill_held = true
 	, func() -> void:
 		touch_skill_held = false
 	)
-	_add_touch_button("DROP", Vector2(1150, 598), Vector2(82, 58), func() -> void:
+	_add_touch_button("丢", Vector2(1150, 598), Vector2(82, 58), func() -> void:
 		touch_drop_requested = true
 	, func() -> void:
 		pass
@@ -645,6 +851,7 @@ func _add_touch_button(text: String, pos: Vector2, size: Vector2, on_down: Calla
 	button.position = pos
 	button.size = size
 	button.modulate = Color(1, 1, 1, 0.78)
+	button.add_theme_font_override("font", UI_FONT)
 	button.add_theme_font_size_override("font_size", 15)
 	button.button_down.connect(on_down)
 	button.button_up.connect(on_up)
@@ -672,6 +879,28 @@ func clamp_to_map(point: Vector2) -> Vector2:
 		clamp(point.x, MAP_RECT.position.x + 25.0, MAP_RECT.end.x - 25.0),
 		clamp(point.y, MAP_RECT.position.y + 25.0, MAP_RECT.end.y - 25.0)
 	)
+
+
+func _is_opening_protected(attacker: Node, target: Node) -> bool:
+	return elapsed < OPENING_GRACE_SECONDS and target == player_pet and attacker != null and attacker.team != player_team
+
+
+func _item_name(kind: String) -> String:
+	if kind == "boom":
+		return "炸弹"
+	if kind == "repair":
+		return "修理罐"
+	if kind == "speed":
+		return "铃铛"
+	if kind == "shield":
+		return "盾牌"
+	if kind == "sock":
+		return "袜子"
+	return "道具"
+
+
+func _base_name(team: String) -> String:
+	return "猫窝" if team == "cat" else "狗窝"
 
 
 func _draw_filled_rect(rect: Rect2, color: Color) -> void:
@@ -715,6 +944,57 @@ func _nearest_free_item(origin: Vector2, max_distance: float) -> Node:
 			best_distance = distance
 			best = item
 	return best
+
+
+func _best_pickup_item(pet: Node, max_distance: float) -> Node:
+	var best: Node = null
+	var best_score := -99999.0
+	for item in items:
+		if item.held_by != null or not item.can_pick_up():
+			continue
+		var distance: float = pet.global_position.distance_to(item.global_position)
+		if distance > max_distance:
+			continue
+		var priority := _pickup_priority(pet, item)
+		if priority < 0:
+			continue
+		var score: float = priority - distance * 0.02
+		if score > best_score:
+			best_score = score
+			best = item
+	return best
+
+
+func _closest_pickup_item(pet: Node, kinds: Array, max_distance: float) -> Node:
+	var best: Node = null
+	var best_distance := max_distance
+	for item in items:
+		if not kinds.has(item.kind) or item.held_by != null or not item.can_pick_up():
+			continue
+		if _pickup_priority(pet, item) < 0:
+			continue
+		var distance: float = pet.global_position.distance_to(item.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			best = item
+	return best
+
+
+func _pickup_priority(pet: Node, item: Node) -> float:
+	if item.kind == "repair":
+		var home_base: BattleBase = bases[pet.team]
+		if home_base.durability >= home_base.max_durability:
+			return -1.0
+		return 55.0
+	if item.kind == "boom":
+		return 120.0
+	if item.kind == "shield":
+		return 85.0
+	if item.kind == "speed":
+		return 80.0
+	if item.kind == "sock":
+		return 60.0
+	return 20.0
 
 
 func _closest_free_item(origin: Vector2, kinds: Array) -> Node:

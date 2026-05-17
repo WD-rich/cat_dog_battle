@@ -15,6 +15,22 @@
   <rect width="2200" height="1240" fill="#f9e8c1"/>
   <rect x="60" y="110" width="2080" height="1000" rx="52" fill="url(#floor)" stroke="#4b2d1d" stroke-width="10"/>
 
+  <g stroke="#4b2d1d" stroke-width="7" stroke-linejoin="round">
+    <path d="M142 128 H612 V262 H142Z" fill="#bde8ff" opacity=".72"/>
+    <path d="M377 128 V262 M142 195 H612" fill="none" opacity=".56"/>
+    <path d="M1588 128 H2058 V262 H1588Z" fill="#bde8ff" opacity=".72"/>
+    <path d="M1823 128 V262 M1588 195 H2058" fill="none" opacity=".56"/>
+    <path d="M930 40 H1270 V120 H930Z" fill="#5f4434"/>
+    <path d="M968 62 H1232 V102 H968Z" fill="#2c211b"/>
+  </g>
+
+  <g opacity=".78" stroke="#3d2418" stroke-width="7" stroke-linejoin="round">
+    <path d="M104 1026 C220 980 370 980 506 1026 C552 1048 556 1094 510 1114 H100 C58 1092 62 1048 104 1026Z" fill="#cf7654"/>
+    <path d="M1694 1026 C1810 980 1960 980 2096 1026 C2138 1048 2142 1092 2100 1114 H1690 C1648 1092 1652 1048 1694 1026Z" fill="#6ba8ed"/>
+    <path d="M210 92 C300 50 454 50 540 92 C586 115 582 154 534 170 H216 C168 154 164 115 210 92Z" fill="#ef8f66"/>
+    <path d="M1660 92 C1750 50 1904 50 1990 92 C2036 115 2032 154 1984 170 H1666 C1618 154 1614 115 1660 92Z" fill="#7bb8ff"/>
+  </g>
+
   <g opacity=".62" fill="none" stroke-linecap="round">
     <path d="M88 620 H565" stroke="#ff8e61" stroke-width="18"/>
     <path d="M1635 620 H2112" stroke="#69a8ff" stroke-width="18"/>
@@ -26,6 +42,28 @@
   <g opacity=".20">
     <circle cx="330" cy="620" r="230" fill="#ff8e61"/>
     <circle cx="1870" cy="620" r="230" fill="#69a8ff"/>
+  </g>
+
+  <g stroke="#3d2418" stroke-width="6" stroke-linejoin="round">
+    <circle cx="275" cy="792" r="34" fill="#ffcf68"/>
+    <circle cx="345" cy="792" r="34" fill="#ffcf68"/>
+    <circle cx="275" cy="792" r="16" fill="#8a5a3b" opacity=".45"/>
+    <circle cx="345" cy="792" r="16" fill="#8a5a3b" opacity=".45"/>
+    <circle cx="1855" cy="792" r="34" fill="#b4d9ff"/>
+    <circle cx="1925" cy="792" r="34" fill="#b4d9ff"/>
+    <circle cx="1855" cy="792" r="16" fill="#4d79a6" opacity=".45"/>
+    <circle cx="1925" cy="792" r="16" fill="#4d79a6" opacity=".45"/>
+    <path d="M286 430 C330 408 374 430 360 470 C326 500 270 486 286 430Z" fill="#f5e7ce"/>
+    <path d="M1810 430 C1854 408 1898 430 1884 470 C1850 500 1794 486 1810 430Z" fill="#f5e7ce"/>
+  </g>
+
+  <g stroke="#3d2418" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="560" cy="760" r="28" fill="#ff7db8"/>
+    <path d="M540 760 C560 730 590 790 620 752" fill="none"/>
+    <path d="M1568 760 C1608 726 1664 742 1680 790 C1632 820 1582 806 1568 760Z" fill="#d9edff"/>
+    <path d="M1540 812 C1580 778 1636 794 1652 842 C1604 872 1554 858 1540 812Z" fill="#d9edff"/>
+    <path d="M470 488 H520 V650 H470Z" fill="#d8a16d"/>
+    <path d="M466 520 H524 M466 560 H524 M466 600 H524" fill="none"/>
   </g>
 
   <path d="M810 432 C940 350 1260 350 1390 432 C1490 514 1488 732 1388 814 C1240 902 958 902 810 814 C708 732 710 514 810 432Z" fill="#e9a778" opacity=".66" stroke="#a87751" stroke-width="7"/>

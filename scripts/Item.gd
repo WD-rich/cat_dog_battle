@@ -117,9 +117,22 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
+	if kind == "boom":
+		var pulse := 1.0 + sin(spin * 3.2) * 0.12
+		draw_circle(Vector2(0, -1), 36.0 * pulse, Color(1.0, 0.72, 0.10, 0.24))
+		draw_circle(Vector2(0, -1), 27.0 * pulse, Color(1.0, 0.42, 0.10, 0.22), false, 5.0)
+		if held_by == null:
+			draw_colored_polygon(PackedVector2Array([
+				Vector2(0, -58),
+				Vector2(-13, -38),
+				Vector2(13, -38),
+			]), Color(1.0, 0.36, 0.12, 0.86))
+			draw_polyline(PackedVector2Array([Vector2(0, -58), Vector2(-13, -38), Vector2(13, -38), Vector2(0, -58)]), Color(0.22, 0.13, 0.08), 2.5)
+
 	if _sprite != null and _sprite.texture != null:
 		var bob := sin(spin * 1.8) * 2.5
-		draw_texture_rect(_sprite.texture, Rect2(Vector2(-30, -31 + bob), Vector2(60, 60)), false)
+		var size := Vector2(76, 76) if kind == "boom" else Vector2(60, 60)
+		draw_texture_rect(_sprite.texture, Rect2(Vector2(-size.x / 2.0, -size.y / 2.0 - 1 + bob), size), false)
 		return
 
 	var shadow := Color(0, 0, 0, 0.16)

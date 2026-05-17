@@ -91,11 +91,30 @@ func _draw() -> void:
 		draw_circle(Vector2(-25, -2), 5, Color(0.18, 0.12, 0.09))
 		draw_circle(Vector2(25, -2), 5, Color(0.18, 0.12, 0.09))
 
+	_draw_damage_marks()
+
 	for i in range(max_durability):
 		var x := -50 + i * 25
 		var pip_color := Color(0.23, 0.86, 0.36) if i < durability else Color(0.55, 0.46, 0.42, 0.35)
 		draw_circle(Vector2(x, 84), 9, pip_color)
 		draw_circle(Vector2(x, 84), 9, Color(0.18, 0.12, 0.09), false, 2.0)
+
+
+func _draw_damage_marks() -> void:
+	var lost := max_durability - durability
+	if lost <= 0:
+		return
+	var crack := Color(0.20, 0.12, 0.08, 0.85)
+	draw_polyline(PackedVector2Array([Vector2(-30, -34), Vector2(-16, -18), Vector2(-26, -2), Vector2(-8, 12)]), crack, 4.0)
+	if lost >= 2:
+		draw_polyline(PackedVector2Array([Vector2(34, -26), Vector2(18, -10), Vector2(30, 8), Vector2(12, 24)]), crack, 4.0)
+		draw_circle(Vector2(-58, 44), 7, Color(0.45, 0.31, 0.22, 0.75))
+	if lost >= 3:
+		draw_polyline(PackedVector2Array([Vector2(-4, -60), Vector2(8, -42), Vector2(-2, -24), Vector2(16, -6)]), crack, 4.0)
+		draw_circle(Vector2(56, 54), 8, Color(0.45, 0.31, 0.22, 0.75))
+	if lost >= 4:
+		draw_circle(Vector2(-18, 60), 9, Color(0.54, 0.36, 0.22, 0.82))
+		draw_line(Vector2(-52, -76), Vector2(-20, -52), Color(0.22, 0.13, 0.08, 0.75), 5.0)
 
 
 func _draw_filled_rect(rect: Rect2, color: Color) -> void:
