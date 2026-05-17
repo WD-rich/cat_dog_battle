@@ -41,8 +41,18 @@ var status_label: Label
 var cooldown_label: Label
 var objective_label: Label
 var event_label: Label
+var touch_controls: Control
 var result_panel: Panel
 var result_label: Label
+
+var touch_up_held := false
+var touch_down_held := false
+var touch_left_held := false
+var touch_right_held := false
+var touch_attack_held := false
+var touch_skill_held := false
+var touch_drop_requested := false
+var touch_move := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -217,6 +227,8 @@ func _create_hud() -> void:
 	event_label.add_theme_color_override("font_color", Color(0.80, 0.18, 0.10))
 	hud_layer.add_child(event_label)
 
+	_create_touch_controls()
+
 	result_panel = Panel.new()
 	result_panel.visible = false
 	result_panel.position = Vector2(430, 250)
@@ -244,6 +256,7 @@ func _handle_player_input() -> void:
 		dir.x -= 1.0
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
 		dir.x += 1.0
+	dir += touch_move
 	player_pet.desired_move = dir
 
 	var mouse_dir := get_global_mouse_position() - player_pet.global_position
@@ -252,12 +265,13 @@ func _handle_player_input() -> void:
 	elif dir.length() > 0.1:
 		player_pet.aim_direction = dir.normalized()
 
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_key_pressed(KEY_J):
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_key_pressed(KEY_J) or touch_attack_held:
 		player_pet.try_attack()
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or Input.is_key_pressed(KEY_K):
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or Input.is_key_pressed(KEY_K) or touch_skill_held:
 		player_pet.try_skill()
-	if Input.is_key_pressed(KEY_E):
+	if Input.is_key_pressed(KEY_E) or touch_drop_requested:
 		player_pet.drop_or_throw_carried()
+		touch_drop_requested = false
 
 
 func _drive_ai(pet: Node, delta: float) -> void:
@@ -521,6 +535,87 @@ func update_hud() -> void:
 func _show_event(message: String) -> void:
 	last_event = message
 	event_timer = 2.8
+
+
+func _create_touch_controls() -> void:
+	touch_controls = Control.new()
+	touch_controls.visible = _should_show_touch_controls()
+	touch_controls.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hud_layer.add_child(touch_controls)
+
+	var pad_size := Vector2(68, 52)
+	_add_touch_button("UP", Vector2(90, 500), pad_size, func() -> void:
+		touch_up_held = true
+		_update_touch_move()
+	, func() -> void:
+		touch_up_held = false
+		_update_touch_move()
+	)
+	_add_touch_button("DOWN", Vector2(90, 612), pad_size, func() -> void:
+		touch_down_held = true
+		_update_touch_move()
+	, func() -> void:
+		touch_down_held = false
+		_update_touch_move()
+	)
+	_add_touch_button("LEFT", Vector2(18, 556), pad_size, func() -> void:
+		touch_left_held = true
+		_update_touch_move()
+	, func() -> void:
+		touch_left_held = false
+		_update_touch_move()
+	)
+	_add_touch_button("RIGHT", Vector2(162, 556), pad_size, func() -> void:
+		touch_right_held = true
+		_update_touch_move()
+	, func() -> void:
+		touch_right_held = false
+		_update_touch_move()
+	)
+
+	_add_touch_button("ATK", Vector2(1054, 530), Vector2(82, 58), func() -> void:
+		touch_attack_held = true
+	, func() -> void:
+		touch_attack_held = false
+	)
+	_add_touch_button("SKL", Vector2(1150, 478), Vector2(82, 58), func() -> void:
+		touch_skill_held = true
+	, func() -> void:
+		touch_skill_held = false
+	)
+	_add_touch_button("DROP", Vector2(1150, 598), Vector2(82, 58), func() -> void:
+		touch_drop_requested = true
+	, func() -> void:
+		pass
+	)
+
+
+func _add_touch_button(text: String, pos: Vector2, size: Vector2, on_down: Callable, on_up: Callable) -> void:
+	var button := Button.new()
+	button.text = text
+	button.position = pos
+	button.size = size
+	button.modulate = Color(1, 1, 1, 0.78)
+	button.add_theme_font_size_override("font_size", 15)
+	button.button_down.connect(on_down)
+	button.button_up.connect(on_up)
+	touch_controls.add_child(button)
+
+
+func _update_touch_move() -> void:
+	touch_move = Vector2.ZERO
+	if touch_up_held:
+		touch_move.y -= 1.0
+	if touch_down_held:
+		touch_move.y += 1.0
+	if touch_left_held:
+		touch_move.x -= 1.0
+	if touch_right_held:
+		touch_move.x += 1.0
+
+
+func _should_show_touch_controls() -> bool:
+	return OS.has_feature("web") or OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("mobile")
 
 
 func clamp_to_map(point: Vector2) -> Vector2:

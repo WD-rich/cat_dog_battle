@@ -29,12 +29,23 @@
 - 技能：`K` 或鼠标右键
 - 丢下/投掷道具：`E`
 - 结束后返回菜单：`Enter` 或空格
+- Web/Android/iOS/mobile 导出时会显示触屏按钮。
 
 ## 运行
 
 1. 安装 Godot 4.x。
 2. 用 Godot 打开本文件夹。
 3. 打开后运行主场景 `scenes/Main.tscn`。
+
+## 平台计划
+
+当前项目已经为多平台做了最小准备：
+
+- 桌面：键盘鼠标输入。
+- Web：项目使用 GDScript 和 Compatibility renderer，可走 Godot 4 Web 导出。
+- Android：战斗内有触屏按钮，但还需要配置 Android SDK 后再导出 APK。
+
+导出步骤见 `EXPORT.md`。
 
 ## 当前实现重点
 

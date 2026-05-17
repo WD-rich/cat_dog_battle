@@ -1,0 +1,59 @@
+# Export Notes
+
+This project targets Godot 4.6.x with GDScript.
+
+## Local Play
+
+Open:
+
+```text
+/Users/wd/games/cat_dog_battle/project.godot
+```
+
+Run the main scene:
+
+```text
+res://scenes/Main.tscn
+```
+
+## Web
+
+Godot 4 Web export supports GDScript projects. This project already uses the Compatibility renderer, which is the correct renderer family for Web export.
+
+Recommended export path:
+
+```text
+builds/web/index.html
+```
+
+Basic steps:
+
+1. Open Godot.
+2. Install export templates if Godot asks for them.
+3. Open `Project -> Export`.
+4. Add a `Web` preset.
+5. Set the output file to `builds/web/index.html`.
+6. Disable threaded export unless the hosting server is configured for cross-origin isolation.
+7. Export and serve the folder through a local or remote web server.
+
+Do not open the exported HTML through `file://`; use a small local server instead.
+
+## Android
+
+Android export requires:
+
+- Godot export templates.
+- Android SDK.
+- JDK 17 or a compatible JDK.
+
+Basic steps:
+
+1. Install or open Android Studio once so the Android SDK is available.
+2. In Godot, open `Editor Settings -> Export -> Android`.
+3. Point Godot to the Android SDK and JDK.
+4. Open `Project -> Export`.
+5. Add an `Android` preset.
+6. Export an APK for device testing.
+
+The battle scene already shows touch controls on Android/mobile builds.
+
