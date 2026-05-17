@@ -47,6 +47,16 @@ var ai_think_timer := 0.0
 
 var _shape: CollisionShape2D
 var _name_label: Label
+var _sprite: Sprite2D
+
+const PET_TEXTURES := {
+	"orange_cat": preload("res://assets/visuals/pet_orange_cat.svg"),
+	"calico_cat": preload("res://assets/visuals/pet_calico_cat.svg"),
+	"ragdoll_cat": preload("res://assets/visuals/pet_ragdoll_cat.svg"),
+	"shiba_dog": preload("res://assets/visuals/pet_shiba_dog.svg"),
+	"corgi_dog": preload("res://assets/visuals/pet_corgi_dog.svg"),
+	"husky_dog": preload("res://assets/visuals/pet_husky_dog.svg"),
+}
 
 
 func setup(data: Dictionary, pet_team: String, player_controlled: bool, ai_role: String, pet_battle: Node) -> void:
@@ -86,6 +96,13 @@ func _ready() -> void:
 	_shape.shape = circle
 	add_child(_shape)
 
+	_sprite = Sprite2D.new()
+	_sprite.texture = PET_TEXTURES.get(pet_key)
+	_sprite.scale = Vector2(0.62, 0.62)
+	_sprite.position = Vector2(0, 5)
+	_sprite.visible = false
+	add_child(_sprite)
+
 	_name_label = Label.new()
 	_name_label.text = display_name
 	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -118,6 +135,7 @@ func _physics_process(delta: float) -> void:
 	knock_velocity = knock_velocity.move_toward(Vector2.ZERO, 900.0 * delta)
 	if battle != null:
 		global_position = battle.clamp_to_map(global_position)
+	_update_visual_direction()
 	queue_redraw()
 
 
@@ -243,26 +261,30 @@ func _draw() -> void:
 	var outline := Color(0.17, 0.10, 0.08, alpha)
 	var body := Color(body_color.r, body_color.g, body_color.b, alpha)
 	var accent := Color(accent_color.r, accent_color.g, accent_color.b, alpha)
+	var has_sprite := _sprite != null and _sprite.texture != null
 
 	draw_circle(Vector2(4, 12), 30, Color(0, 0, 0, 0.16 * alpha))
 
-	if team == "cat":
-		draw_polygon(PackedVector2Array([Vector2(-25, -18), Vector2(-17, -42), Vector2(-3, -21)]), PackedColorArray([body, body, body]))
-		draw_polygon(PackedVector2Array([Vector2(25, -18), Vector2(17, -42), Vector2(3, -21)]), PackedColorArray([body, body, body]))
-		draw_polyline(PackedVector2Array([Vector2(-25, -18), Vector2(-17, -42), Vector2(-3, -21)]), outline, 3.0)
-		draw_polyline(PackedVector2Array([Vector2(25, -18), Vector2(17, -42), Vector2(3, -21)]), outline, 3.0)
+	if has_sprite:
+		draw_texture_rect(_sprite.texture, Rect2(Vector2(-40, -43), Vector2(80, 80)), false, Color(1, 1, 1, alpha))
 	else:
-		draw_polygon(PackedVector2Array([Vector2(-22, -22), Vector2(-43, -30), Vector2(-37, 12), Vector2(-18, 9)]), PackedColorArray([accent, accent, accent, accent]))
-		draw_polygon(PackedVector2Array([Vector2(22, -22), Vector2(43, -30), Vector2(37, 12), Vector2(18, 9)]), PackedColorArray([accent, accent, accent, accent]))
-		draw_polyline(PackedVector2Array([Vector2(-22, -22), Vector2(-43, -30), Vector2(-37, 12), Vector2(-18, 9)]), outline, 3.0)
-		draw_polyline(PackedVector2Array([Vector2(22, -22), Vector2(43, -30), Vector2(37, 12), Vector2(18, 9)]), outline, 3.0)
+		if team == "cat":
+			draw_polygon(PackedVector2Array([Vector2(-25, -18), Vector2(-17, -42), Vector2(-3, -21)]), PackedColorArray([body, body, body]))
+			draw_polygon(PackedVector2Array([Vector2(25, -18), Vector2(17, -42), Vector2(3, -21)]), PackedColorArray([body, body, body]))
+			draw_polyline(PackedVector2Array([Vector2(-25, -18), Vector2(-17, -42), Vector2(-3, -21)]), outline, 3.0)
+			draw_polyline(PackedVector2Array([Vector2(25, -18), Vector2(17, -42), Vector2(3, -21)]), outline, 3.0)
+		else:
+			draw_polygon(PackedVector2Array([Vector2(-22, -22), Vector2(-43, -30), Vector2(-37, 12), Vector2(-18, 9)]), PackedColorArray([accent, accent, accent, accent]))
+			draw_polygon(PackedVector2Array([Vector2(22, -22), Vector2(43, -30), Vector2(37, 12), Vector2(18, 9)]), PackedColorArray([accent, accent, accent, accent]))
+			draw_polyline(PackedVector2Array([Vector2(-22, -22), Vector2(-43, -30), Vector2(-37, 12), Vector2(-18, 9)]), outline, 3.0)
+			draw_polyline(PackedVector2Array([Vector2(22, -22), Vector2(43, -30), Vector2(37, 12), Vector2(18, 9)]), outline, 3.0)
 
-	draw_circle(Vector2.ZERO, 29, body)
-	draw_circle(Vector2.ZERO, 29, outline, false, 3.0)
-	draw_circle(Vector2(-10, -5), 4, outline)
-	draw_circle(Vector2(10, -5), 4, outline)
-	draw_circle(Vector2(0, 5), 3, outline)
-	draw_arc(Vector2(0, 10), 10, 0.15, PI - 0.15, 18, outline, 2.0)
+		draw_circle(Vector2.ZERO, 29, body)
+		draw_circle(Vector2.ZERO, 29, outline, false, 3.0)
+		draw_circle(Vector2(-10, -5), 4, outline)
+		draw_circle(Vector2(10, -5), 4, outline)
+		draw_circle(Vector2(0, 5), 3, outline)
+		draw_arc(Vector2(0, 10), 10, 0.15, PI - 0.15, 18, outline, 2.0)
 
 	if is_player:
 		draw_circle(Vector2.ZERO, 35, Color(1.0, 0.95, 0.30, 0.32), false, 4.0)
@@ -277,3 +299,14 @@ func _draw() -> void:
 
 	if carried_item != null:
 		draw_line(Vector2(0, -28), Vector2(0, -40), outline, 2.0)
+
+
+func _update_visual_direction() -> void:
+	if _sprite == null:
+		return
+	var facing := 1.0
+	if aim_direction.x < -0.1:
+		facing = -1.0
+	elif aim_direction.x > 0.1:
+		facing = 1.0
+	_sprite.scale.x = abs(_sprite.scale.x) * facing

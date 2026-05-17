@@ -10,6 +10,24 @@ var projectile_time := 0.0
 var spin := 0.0
 var spawn_point := Vector2.ZERO
 
+var _sprite: Sprite2D
+
+const ITEM_TEXTURES := {
+	"boom": preload("res://assets/visuals/item_boom.svg"),
+	"repair": preload("res://assets/visuals/item_repair.svg"),
+	"speed": preload("res://assets/visuals/item_speed.svg"),
+	"shield": preload("res://assets/visuals/item_shield.svg"),
+	"sock": preload("res://assets/visuals/item_sock.svg"),
+}
+
+
+func _ready() -> void:
+	_sprite = Sprite2D.new()
+	_sprite.texture = ITEM_TEXTURES.get(kind)
+	_sprite.scale = Vector2(0.62, 0.62)
+	_sprite.visible = false
+	add_child(_sprite)
+
 
 func setup(item_kind: String, start_position: Vector2) -> void:
 	kind = item_kind
@@ -90,11 +108,20 @@ func _process(delta: float) -> void:
 			projectile_time = max(0.0, projectile_time - delta)
 		if pickup_lock > 0.0:
 			pickup_lock = max(0.0, pickup_lock - delta)
-	spin += delta * 5.0
+		spin += delta * 5.0
+	if _sprite != null:
+		var bob := sin(spin * 1.8) * 2.5
+		_sprite.position = Vector2(0, bob)
+		_sprite.rotation = sin(spin) * 0.08
 	queue_redraw()
 
 
 func _draw() -> void:
+	if _sprite != null and _sprite.texture != null:
+		var bob := sin(spin * 1.8) * 2.5
+		draw_texture_rect(_sprite.texture, Rect2(Vector2(-30, -31 + bob), Vector2(60, 60)), false)
+		return
+
 	var shadow := Color(0, 0, 0, 0.16)
 	draw_circle(Vector2(3, 12), 20, shadow)
 
@@ -125,4 +152,3 @@ func _draw() -> void:
 		draw_circle(Vector2(7, 3), 15, Color(0.74, 0.70, 0.66))
 		draw_circle(Vector2(17, -2), 10, Color(0.58, 0.55, 0.50))
 		draw_circle(Vector2(-2, 0), 3, Color(0.18, 0.12, 0.09))
-

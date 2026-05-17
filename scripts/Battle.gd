@@ -4,6 +4,7 @@ const PetScript := preload("res://scripts/Pet.gd")
 const BaseScript := preload("res://scripts/Base.gd")
 const ItemScript := preload("res://scripts/Item.gd")
 const GameDataScript := preload("res://scripts/GameData.gd")
+const ARENA_TEXTURE := preload("res://assets/visuals/arena_living_room.svg")
 
 const MAP_RECT := Rect2(44, 74, 1192, 592)
 const CAT_BASE_POS := Vector2(138, 360)
@@ -99,18 +100,22 @@ func _physics_process(delta: float) -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), Color(0.99, 0.93, 0.78), true, 0.0)
-	draw_rect(MAP_RECT, Color(0.94, 0.84, 0.65), true, 0.0)
-	draw_rect(MAP_RECT, Color(0.26, 0.17, 0.11), false, 5.0)
-	draw_rect(Rect2(Vector2(438, 242), Vector2(404, 236)), Color(0.86, 0.58, 0.45, 0.46), true, 0.0)
-	draw_rect(Rect2(Vector2(438, 242), Vector2(404, 236)), Color(0.51, 0.30, 0.22), false, 3.0)
-	draw_circle(Vector2(640, 360), 56, Color(1.0, 0.82, 0.32, 0.22))
-	draw_circle(Vector2(640, 360), 56, Color(0.63, 0.43, 0.14, 0.55), false, 3.0)
+	if ARENA_TEXTURE != null:
+		draw_texture_rect(ARENA_TEXTURE, Rect2(Vector2.ZERO, Vector2(1280, 720)), false)
+		draw_rect(MAP_RECT, Color(0.26, 0.17, 0.11, 0.35), false, 5.0)
+	else:
+		draw_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), Color(0.99, 0.93, 0.78), true, 0.0)
+		draw_rect(MAP_RECT, Color(0.94, 0.84, 0.65), true, 0.0)
+		draw_rect(MAP_RECT, Color(0.26, 0.17, 0.11), false, 5.0)
+		draw_rect(Rect2(Vector2(438, 242), Vector2(404, 236)), Color(0.86, 0.58, 0.45, 0.46), true, 0.0)
+		draw_rect(Rect2(Vector2(438, 242), Vector2(404, 236)), Color(0.51, 0.30, 0.22), false, 3.0)
+		draw_circle(Vector2(640, 360), 56, Color(1.0, 0.82, 0.32, 0.22))
+		draw_circle(Vector2(640, 360), 56, Color(0.63, 0.43, 0.14, 0.55), false, 3.0)
 
-	for rect in obstacle_rects:
-		draw_rect(rect, Color(0.64, 0.40, 0.28), true, 0.0)
-		draw_rect(rect, Color(0.24, 0.14, 0.09), false, 4.0)
-		draw_line(rect.position + Vector2(8, 8), rect.position + rect.size - Vector2(8, 8), Color(0.78, 0.55, 0.38), 2.0)
+		for rect in obstacle_rects:
+			draw_rect(rect, Color(0.64, 0.40, 0.28), true, 0.0)
+			draw_rect(rect, Color(0.24, 0.14, 0.09), false, 4.0)
+			draw_line(rect.position + Vector2(8, 8), rect.position + rect.size - Vector2(8, 8), Color(0.78, 0.55, 0.38), 2.0)
 
 
 func _create_map() -> void:
@@ -615,7 +620,7 @@ func _update_touch_move() -> void:
 
 
 func _should_show_touch_controls() -> bool:
-	return OS.has_feature("web") or OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("mobile")
+	return DisplayServer.is_touchscreen_available() or OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("mobile")
 
 
 func clamp_to_map(point: Vector2) -> Vector2:

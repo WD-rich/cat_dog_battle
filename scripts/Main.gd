@@ -13,6 +13,12 @@ func _ready() -> void:
 	_build_menu()
 
 
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ENTER or event.keycode == KEY_SPACE:
+			_start(selected_team)
+
+
 func _build_menu() -> void:
 	for child in get_children():
 		remove_child(child)
@@ -61,9 +67,19 @@ func _build_menu() -> void:
 	status.add_theme_color_override("font_color", Color(0.24, 0.16, 0.11))
 	left.add_child(status)
 
+	var start_button := _make_button("Start 3v3 Base Siege")
+	start_button.custom_minimum_size = Vector2(440, 62)
+	start_button.add_theme_font_size_override("font_size", 25)
+	start_button.add_theme_color_override("font_color", Color(1.0, 0.96, 0.86))
+	start_button.add_theme_stylebox_override("normal", _button_style(Color(0.93, 0.35, 0.18)))
+	start_button.add_theme_stylebox_override("hover", _button_style(Color(1.0, 0.45, 0.22)))
+	start_button.add_theme_stylebox_override("pressed", _button_style(Color(0.73, 0.22, 0.13)))
+	start_button.pressed.connect(func() -> void: _start(selected_team))
+	left.add_child(start_button)
+
 	var prep := Label.new()
-	prep.text = "Prep Phase"
-	prep.add_theme_font_size_override("font_size", 25)
+	prep.text = "Prep Phase  -  Enter / Space starts"
+	prep.add_theme_font_size_override("font_size", 20)
 	prep.add_theme_color_override("font_color", Color(0.18, 0.11, 0.08))
 	left.add_child(prep)
 
@@ -122,12 +138,6 @@ func _build_menu() -> void:
 	)
 	left.add_child(upgrade_button)
 
-	var start_button := _make_button("Start 3v3 Match")
-	start_button.custom_minimum_size = Vector2(440, 58)
-	start_button.add_theme_font_size_override("font_size", 24)
-	start_button.pressed.connect(func() -> void: _start(selected_team))
-	left.add_child(start_button)
-
 	var slice_title := Label.new()
 	slice_title.text = "Playable Loop"
 	slice_title.add_theme_font_size_override("font_size", 27)
@@ -175,6 +185,20 @@ func _make_button(text: String) -> Button:
 	button.custom_minimum_size = Vector2(220, 48)
 	button.add_theme_font_size_override("font_size", 19)
 	return button
+
+
+func _button_style(color: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = color
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	return style
 
 
 func _make_pet_button(key: String) -> Button:
