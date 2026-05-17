@@ -6,21 +6,23 @@ const ItemScript := preload("res://scripts/Item.gd")
 const GameDataScript := preload("res://scripts/GameData.gd")
 const ARENA_TEXTURE := preload("res://assets/visuals/arena_living_room.svg")
 
-const MAP_RECT := Rect2(44, 74, 1192, 592)
-const CAT_BASE_POS := Vector2(138, 360)
-const DOG_BASE_POS := Vector2(1142, 360)
+const MAP_RECT := Rect2(18, 64, 1244, 606)
+const CAT_BASE_POS := Vector2(112, 360)
+const DOG_BASE_POS := Vector2(1168, 360)
 
 var pets: Array = []
 var items: Array = []
 var bases := {}
 var obstacle_rects: Array[Rect2] = []
 var aux_spawn_points := [
-	Vector2(640, 150),
-	Vector2(640, 570),
-	Vector2(355, 215),
-	Vector2(925, 505),
-	Vector2(355, 505),
-	Vector2(925, 215),
+	Vector2(640, 165),
+	Vector2(640, 555),
+	Vector2(330, 205),
+	Vector2(950, 205),
+	Vector2(330, 515),
+	Vector2(950, 515),
+	Vector2(455, 360),
+	Vector2(825, 360),
 ]
 
 var player_pet: Node = null
@@ -66,8 +68,10 @@ func _ready() -> void:
 	_create_pets()
 	_create_hud()
 	_spawn_item("boom", Vector2(640, 360))
-	_spawn_item("repair", Vector2(640, 150))
-	_spawn_item("shield", Vector2(640, 570))
+	_spawn_item("repair", Vector2(455, 360))
+	_spawn_item("shield", Vector2(640, 555))
+	_spawn_item("speed", Vector2(640, 165))
+	_spawn_item("sock", Vector2(825, 360))
 	_show_event("Grab the Boom Snack and invade the enemy base.")
 	update_hud()
 
@@ -104,28 +108,28 @@ func _draw() -> void:
 		draw_texture_rect(ARENA_TEXTURE, Rect2(Vector2.ZERO, Vector2(1280, 720)), false)
 		draw_rect(MAP_RECT, Color(0.26, 0.17, 0.11, 0.35), false, 5.0)
 	else:
-		draw_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), Color(0.99, 0.93, 0.78), true, 0.0)
-		draw_rect(MAP_RECT, Color(0.94, 0.84, 0.65), true, 0.0)
+		_draw_filled_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), Color(0.99, 0.93, 0.78))
+		_draw_filled_rect(MAP_RECT, Color(0.94, 0.84, 0.65))
 		draw_rect(MAP_RECT, Color(0.26, 0.17, 0.11), false, 5.0)
-		draw_rect(Rect2(Vector2(438, 242), Vector2(404, 236)), Color(0.86, 0.58, 0.45, 0.46), true, 0.0)
+		_draw_filled_rect(Rect2(Vector2(438, 242), Vector2(404, 236)), Color(0.86, 0.58, 0.45, 0.46))
 		draw_rect(Rect2(Vector2(438, 242), Vector2(404, 236)), Color(0.51, 0.30, 0.22), false, 3.0)
 		draw_circle(Vector2(640, 360), 56, Color(1.0, 0.82, 0.32, 0.22))
 		draw_circle(Vector2(640, 360), 56, Color(0.63, 0.43, 0.14, 0.55), false, 3.0)
 
 		for rect in obstacle_rects:
-			draw_rect(rect, Color(0.64, 0.40, 0.28), true, 0.0)
+			_draw_filled_rect(rect, Color(0.64, 0.40, 0.28))
 			draw_rect(rect, Color(0.24, 0.14, 0.09), false, 4.0)
 			draw_line(rect.position + Vector2(8, 8), rect.position + rect.size - Vector2(8, 8), Color(0.78, 0.55, 0.38), 2.0)
 
 
 func _create_map() -> void:
 	obstacle_rects = [
-		Rect2(Vector2(310, 110), Vector2(126, 92)),
-		Rect2(Vector2(318, 510), Vector2(146, 84)),
-		Rect2(Vector2(816, 110), Vector2(146, 84)),
-		Rect2(Vector2(844, 512), Vector2(126, 92)),
-		Rect2(Vector2(548, 90), Vector2(184, 58)),
-		Rect2(Vector2(548, 572), Vector2(184, 58)),
+		Rect2(Vector2(286, 112), Vector2(168, 76)),
+		Rect2(Vector2(826, 112), Vector2(168, 76)),
+		Rect2(Vector2(286, 504), Vector2(176, 82)),
+		Rect2(Vector2(818, 504), Vector2(176, 82)),
+		Rect2(Vector2(502, 92), Vector2(276, 58)),
+		Rect2(Vector2(505, 578), Vector2(270, 56)),
 	]
 
 	for rect in obstacle_rects:
@@ -157,8 +161,8 @@ func _create_bases() -> void:
 func _create_pets() -> void:
 	var cat_keys := _team_lineup("cat")
 	var dog_keys := _team_lineup("dog")
-	_create_team("cat", cat_keys, CAT_BASE_POS + Vector2(120, 0))
-	_create_team("dog", dog_keys, DOG_BASE_POS + Vector2(-120, 0))
+	_create_team("cat", cat_keys, CAT_BASE_POS + Vector2(145, 0))
+	_create_team("dog", dog_keys, DOG_BASE_POS + Vector2(-145, 0))
 
 
 func _team_lineup(team: String) -> Array:
@@ -173,7 +177,7 @@ func _team_lineup(team: String) -> Array:
 
 func _create_team(team: String, keys: Array, center: Vector2) -> void:
 	var roles := ["striker", "escort", "defender"]
-	var offsets := [Vector2.ZERO, Vector2(-25, -78), Vector2(-25, 78)] if team == "cat" else [Vector2.ZERO, Vector2(25, -78), Vector2(25, 78)]
+	var offsets := [Vector2.ZERO, Vector2(74, -112), Vector2(74, 112)] if team == "cat" else [Vector2.ZERO, Vector2(-74, -112), Vector2(-74, 112)]
 	for i in range(keys.size()):
 		var pet := PetScript.new()
 		var controlled := team == player_team and i == 0
@@ -210,17 +214,17 @@ func _create_hud() -> void:
 	hud_layer.add_child(status_label)
 
 	cooldown_label = Label.new()
-	cooldown_label.position = Vector2(20, 16)
-	cooldown_label.size = Vector2(360, 92)
+	cooldown_label.position = Vector2(20, 18)
+	cooldown_label.size = Vector2(390, 28)
 	cooldown_label.add_theme_font_size_override("font_size", 16)
 	cooldown_label.add_theme_color_override("font_color", Color(0.20, 0.13, 0.09))
 	hud_layer.add_child(cooldown_label)
 
 	objective_label = Label.new()
-	objective_label.position = Vector2(390, 48)
+	objective_label.position = Vector2(390, 43)
 	objective_label.size = Vector2(500, 30)
 	objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	objective_label.add_theme_font_size_override("font_size", 16)
+	objective_label.add_theme_font_size_override("font_size", 14)
 	objective_label.add_theme_color_override("font_color", Color(0.20, 0.13, 0.09))
 	hud_layer.add_child(objective_label)
 
@@ -525,7 +529,7 @@ func update_hud() -> void:
 	]
 	if player_pet != null:
 		var item_name = "None" if player_pet.carried_item == null else player_pet.carried_item.kind.capitalize()
-		cooldown_label.text = "HP %d/%d\nSkill %.1fs\nCarrying: %s\nCoins: %d" % [
+		cooldown_label.text = "HP %d/%d   Skill %.1fs   Item %s   Coins %d" % [
 			int(ceil(player_pet.hp)),
 			int(ceil(player_pet.max_hp)),
 			player_pet.skill_timer,
@@ -628,6 +632,15 @@ func clamp_to_map(point: Vector2) -> Vector2:
 		clamp(point.x, MAP_RECT.position.x + 25.0, MAP_RECT.end.x - 25.0),
 		clamp(point.y, MAP_RECT.position.y + 25.0, MAP_RECT.end.y - 25.0)
 	)
+
+
+func _draw_filled_rect(rect: Rect2, color: Color) -> void:
+	draw_colored_polygon(PackedVector2Array([
+		rect.position,
+		rect.position + Vector2(rect.size.x, 0),
+		rect.position + rect.size,
+		rect.position + Vector2(0, rect.size.y),
+	]), color)
 
 
 func get_respawn_time(team: String) -> float:

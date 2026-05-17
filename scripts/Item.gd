@@ -132,10 +132,10 @@ func _draw() -> void:
 		draw_line(Vector2(14, -17), Vector2(24, -28), Color(0.20, 0.12, 0.08), 4.0)
 		draw_circle(Vector2(27, -31), 5, Color(1.0, 0.16, 0.10))
 	elif kind == "repair":
-		draw_rect(Rect2(Vector2(-19, -21), Vector2(38, 42)), Color(0.35, 0.86, 0.58), true, 0.0)
+		_draw_filled_rect(Rect2(Vector2(-19, -21), Vector2(38, 42)), Color(0.35, 0.86, 0.58))
 		draw_rect(Rect2(Vector2(-19, -21), Vector2(38, 42)), Color(0.16, 0.11, 0.08), false, 3.0)
-		draw_rect(Rect2(Vector2(-5, -15), Vector2(10, 30)), Color.WHITE, true, 0.0)
-		draw_rect(Rect2(Vector2(-15, -5), Vector2(30, 10)), Color.WHITE, true, 0.0)
+		_draw_filled_rect(Rect2(Vector2(-5, -15), Vector2(10, 30)), Color.WHITE)
+		_draw_filled_rect(Rect2(Vector2(-15, -5), Vector2(30, 10)), Color.WHITE)
 	elif kind == "speed":
 		draw_circle(Vector2.ZERO, 20, Color(1.0, 0.86, 0.21))
 		draw_circle(Vector2.ZERO, 20, Color(0.16, 0.11, 0.08), false, 3.0)
@@ -152,3 +152,12 @@ func _draw() -> void:
 		draw_circle(Vector2(7, 3), 15, Color(0.74, 0.70, 0.66))
 		draw_circle(Vector2(17, -2), 10, Color(0.58, 0.55, 0.50))
 		draw_circle(Vector2(-2, 0), 3, Color(0.18, 0.12, 0.09))
+
+
+func _draw_filled_rect(rect: Rect2, color: Color) -> void:
+	draw_colored_polygon(PackedVector2Array([
+		rect.position,
+		rect.position + Vector2(rect.size.x, 0),
+		rect.position + rect.size,
+		rect.position + Vector2(0, rect.size.y),
+	]), color)

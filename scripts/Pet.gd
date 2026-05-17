@@ -266,7 +266,7 @@ func _draw() -> void:
 	draw_circle(Vector2(4, 12), 30, Color(0, 0, 0, 0.16 * alpha))
 
 	if has_sprite:
-		draw_texture_rect(_sprite.texture, Rect2(Vector2(-40, -43), Vector2(80, 80)), false, Color(1, 1, 1, alpha))
+		draw_texture_rect(_sprite.texture, Rect2(Vector2(-43, -48), Vector2(86, 86)), false, Color(1, 1, 1, alpha))
 	else:
 		if team == "cat":
 			draw_polygon(PackedVector2Array([Vector2(-25, -18), Vector2(-17, -42), Vector2(-3, -21)]), PackedColorArray([body, body, body]))
@@ -294,11 +294,20 @@ func _draw() -> void:
 
 	var bar_width := 58.0
 	var hp_ratio := clamp(hp / max_hp, 0.0, 1.0)
-	draw_rect(Rect2(Vector2(-bar_width / 2.0, -54), Vector2(bar_width, 7)), Color(0.18, 0.11, 0.09, 0.85), true, 0.0)
-	draw_rect(Rect2(Vector2(-bar_width / 2.0 + 1, -53), Vector2((bar_width - 2) * hp_ratio, 5)), Color(0.30, 0.95, 0.38), true, 0.0)
+	_draw_filled_rect(Rect2(Vector2(-bar_width / 2.0, -54), Vector2(bar_width, 7)), Color(0.18, 0.11, 0.09, 0.85))
+	_draw_filled_rect(Rect2(Vector2(-bar_width / 2.0 + 1, -53), Vector2((bar_width - 2) * hp_ratio, 5)), Color(0.30, 0.95, 0.38))
 
 	if carried_item != null:
 		draw_line(Vector2(0, -28), Vector2(0, -40), outline, 2.0)
+
+
+func _draw_filled_rect(rect: Rect2, color: Color) -> void:
+	draw_colored_polygon(PackedVector2Array([
+		rect.position,
+		rect.position + Vector2(rect.size.x, 0),
+		rect.position + rect.size,
+		rect.position + Vector2(0, rect.size.y),
+	]), color)
 
 
 func _update_visual_direction() -> void:

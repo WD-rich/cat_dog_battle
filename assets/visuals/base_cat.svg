@@ -4,8 +4,9 @@
   <path d="M33 76 L90 26 L147 76Z" fill="#ee5a38" stroke="#3a2418" stroke-width="7" stroke-linejoin="round"/>
   <path d="M45 75 L60 30 L76 77Z" fill="#ee5a38" stroke="#3a2418" stroke-width="6" stroke-linejoin="round"/>
   <path d="M135 75 L120 30 L104 77Z" fill="#ee5a38" stroke="#3a2418" stroke-width="6" stroke-linejoin="round"/>
-  <rect x="38" y="74" width="104" height="76" rx="13" fill="#ffb267" stroke="#3a2418" stroke-width="7"/>
-  <rect x="76" y="104" width="28" height="46" rx="8" fill="#5b3424"/>
+  <path d="M46 78 C62 68 119 68 136 78 C151 92 150 132 137 148 C116 160 64 160 43 148 C30 132 31 92 46 78Z" fill="#ffb267" stroke="#3a2418" stroke-width="7"/>
+  <path d="M76 108 C78 96 102 96 104 108 V150 H76Z" fill="#5b3424" stroke="#3a2418" stroke-width="3"/>
   <circle cx="60" cy="103" r="7" fill="#3a2418"/>
   <circle cx="120" cy="103" r="7" fill="#3a2418"/>
+  <path d="M78 122 C86 128 94 128 102 122" fill="none" stroke="#ffcf8e" stroke-width="4" stroke-linecap="round"/>
 </svg>

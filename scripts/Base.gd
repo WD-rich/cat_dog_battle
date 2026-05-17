@@ -69,7 +69,7 @@ func _draw() -> void:
 	else:
 		draw_circle(Vector2(4, 14), 72, Color(0, 0, 0, 0.15))
 		var body_rect := Rect2(Vector2(-58, -20), Vector2(116, 82))
-		draw_rect(body_rect, body_color, true, 0.0)
+		_draw_filled_rect(body_rect, body_color)
 		draw_rect(body_rect, Color(0.18, 0.12, 0.09), false, 4.0)
 
 		if team == "cat":
@@ -87,7 +87,7 @@ func _draw() -> void:
 			)
 			draw_polyline(PackedVector2Array([Vector2(-70, -18), Vector2(-34, -70), Vector2(34, -70), Vector2(70, -18)]), Color(0.18, 0.12, 0.09), 4.0)
 
-		draw_rect(Rect2(Vector2(-20, 14), Vector2(40, 48)), Color(0.24, 0.15, 0.10), true, 0.0)
+		_draw_filled_rect(Rect2(Vector2(-20, 14), Vector2(40, 48)), Color(0.24, 0.15, 0.10))
 		draw_circle(Vector2(-25, -2), 5, Color(0.18, 0.12, 0.09))
 		draw_circle(Vector2(25, -2), 5, Color(0.18, 0.12, 0.09))
 
@@ -96,3 +96,12 @@ func _draw() -> void:
 		var pip_color := Color(0.23, 0.86, 0.36) if i < durability else Color(0.55, 0.46, 0.42, 0.35)
 		draw_circle(Vector2(x, 84), 9, pip_color)
 		draw_circle(Vector2(x, 84), 9, Color(0.18, 0.12, 0.09), false, 2.0)
+
+
+func _draw_filled_rect(rect: Rect2, color: Color) -> void:
+	draw_colored_polygon(PackedVector2Array([
+		rect.position,
+		rect.position + Vector2(rect.size.x, 0),
+		rect.position + rect.size,
+		rect.position + Vector2(0, rect.size.y),
+	]), color)
