@@ -6,37 +6,44 @@ const ItemScript := preload("res://scripts/Item.gd")
 const GameDataScript := preload("res://scripts/GameData.gd")
 const ARENA_TEXTURE := preload("res://assets/visuals/arena_living_room.svg")
 
-const MAP_RECT := Rect2(18, 64, 1244, 606)
-const CAT_BASE_POS := Vector2(112, 360)
-const DOG_BASE_POS := Vector2(1168, 360)
+const WORLD_SIZE := Vector2(2200, 1240)
+const MAP_RECT := Rect2(60, 110, 2080, 1000)
+const CENTER_POS := Vector2(1100, 620)
+const CAT_BASE_POS := Vector2(180, 620)
+const DOG_BASE_POS := Vector2(2020, 620)
 
 var pets: Array = []
 var items: Array = []
 var bases := {}
 var obstacle_rects: Array[Rect2] = []
 var aux_spawn_points := [
-	Vector2(640, 165),
-	Vector2(640, 555),
-	Vector2(330, 205),
-	Vector2(950, 205),
-	Vector2(330, 515),
-	Vector2(950, 515),
-	Vector2(455, 360),
-	Vector2(825, 360),
+	Vector2(1100, 300),
+	Vector2(1100, 940),
+	Vector2(720, 340),
+	Vector2(1480, 340),
+	Vector2(720, 900),
+	Vector2(1480, 900),
+	Vector2(520, 620),
+	Vector2(1680, 620),
+	Vector2(920, 500),
+	Vector2(1280, 740),
+	Vector2(360, 330),
+	Vector2(1840, 910),
 ]
 
 var player_pet: Node = null
 var player_team := "cat"
 var enemy_team := "dog"
 var match_over := false
-var match_time_limit := 180.0
-var match_time_left := 180.0
+var match_time_limit := 240.0
+var match_time_left := 240.0
 var boom_respawn_timer := 0.0
 var aux_spawn_timer := 4.0
 var elapsed := 0.0
 var last_event := ""
 var event_timer := 0.0
 var rng := RandomNumberGenerator.new()
+var camera: Camera2D
 
 var hud_layer: CanvasLayer
 var score_label: Label
@@ -66,12 +73,13 @@ func _ready() -> void:
 	_create_map()
 	_create_bases()
 	_create_pets()
+	_create_camera()
 	_create_hud()
-	_spawn_item("boom", Vector2(640, 360))
-	_spawn_item("repair", Vector2(455, 360))
-	_spawn_item("shield", Vector2(640, 555))
-	_spawn_item("speed", Vector2(640, 165))
-	_spawn_item("sock", Vector2(825, 360))
+	_spawn_item("boom", CENTER_POS)
+	_spawn_item("repair", Vector2(520, 620))
+	_spawn_item("shield", Vector2(1100, 940))
+	_spawn_item("speed", Vector2(1100, 300))
+	_spawn_item("sock", Vector2(1680, 620))
 	_show_event("Grab the Boom Snack and invade the enemy base.")
 	update_hud()
 
@@ -90,6 +98,7 @@ func _physics_process(delta: float) -> void:
 		_finish_by_time()
 		return
 	_handle_player_input()
+	_update_camera(delta)
 	for pet in pets:
 		if pet != player_pet:
 			_drive_ai(pet, delta)
@@ -105,16 +114,16 @@ func _physics_process(delta: float) -> void:
 
 func _draw() -> void:
 	if ARENA_TEXTURE != null:
-		draw_texture_rect(ARENA_TEXTURE, Rect2(Vector2.ZERO, Vector2(1280, 720)), false)
+		draw_texture_rect(ARENA_TEXTURE, Rect2(Vector2.ZERO, WORLD_SIZE), false)
 		draw_rect(MAP_RECT, Color(0.26, 0.17, 0.11, 0.35), false, 5.0)
 	else:
-		_draw_filled_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), Color(0.99, 0.93, 0.78))
+		_draw_filled_rect(Rect2(Vector2.ZERO, WORLD_SIZE), Color(0.99, 0.93, 0.78))
 		_draw_filled_rect(MAP_RECT, Color(0.94, 0.84, 0.65))
 		draw_rect(MAP_RECT, Color(0.26, 0.17, 0.11), false, 5.0)
-		_draw_filled_rect(Rect2(Vector2(438, 242), Vector2(404, 236)), Color(0.86, 0.58, 0.45, 0.46))
-		draw_rect(Rect2(Vector2(438, 242), Vector2(404, 236)), Color(0.51, 0.30, 0.22), false, 3.0)
-		draw_circle(Vector2(640, 360), 56, Color(1.0, 0.82, 0.32, 0.22))
-		draw_circle(Vector2(640, 360), 56, Color(0.63, 0.43, 0.14, 0.55), false, 3.0)
+		_draw_filled_rect(Rect2(Vector2(820, 440), Vector2(560, 360)), Color(0.86, 0.58, 0.45, 0.46))
+		draw_rect(Rect2(Vector2(820, 440), Vector2(560, 360)), Color(0.51, 0.30, 0.22), false, 3.0)
+		draw_circle(CENTER_POS, 80, Color(1.0, 0.82, 0.32, 0.22))
+		draw_circle(CENTER_POS, 80, Color(0.63, 0.43, 0.14, 0.55), false, 3.0)
 
 		for rect in obstacle_rects:
 			_draw_filled_rect(rect, Color(0.64, 0.40, 0.28))
@@ -124,12 +133,14 @@ func _draw() -> void:
 
 func _create_map() -> void:
 	obstacle_rects = [
-		Rect2(Vector2(286, 112), Vector2(168, 76)),
-		Rect2(Vector2(826, 112), Vector2(168, 76)),
-		Rect2(Vector2(286, 504), Vector2(176, 82)),
-		Rect2(Vector2(818, 504), Vector2(176, 82)),
-		Rect2(Vector2(502, 92), Vector2(276, 58)),
-		Rect2(Vector2(505, 578), Vector2(270, 56)),
+		Rect2(Vector2(420, 180), Vector2(270, 120)),
+		Rect2(Vector2(1510, 180), Vector2(270, 120)),
+		Rect2(Vector2(420, 935), Vector2(300, 130)),
+		Rect2(Vector2(1480, 935), Vector2(300, 130)),
+		Rect2(Vector2(820, 145), Vector2(560, 105)),
+		Rect2(Vector2(820, 990), Vector2(560, 105)),
+		Rect2(Vector2(840, 470), Vector2(170, 125)),
+		Rect2(Vector2(1190, 645), Vector2(170, 125)),
 	]
 
 	for rect in obstacle_rects:
@@ -161,8 +172,8 @@ func _create_bases() -> void:
 func _create_pets() -> void:
 	var cat_keys := _team_lineup("cat")
 	var dog_keys := _team_lineup("dog")
-	_create_team("cat", cat_keys, CAT_BASE_POS + Vector2(145, 0))
-	_create_team("dog", dog_keys, DOG_BASE_POS + Vector2(-145, 0))
+	_create_team("cat", cat_keys, CAT_BASE_POS + Vector2(240, 0))
+	_create_team("dog", dog_keys, DOG_BASE_POS + Vector2(-240, 0))
 
 
 func _team_lineup(team: String) -> Array:
@@ -177,7 +188,7 @@ func _team_lineup(team: String) -> Array:
 
 func _create_team(team: String, keys: Array, center: Vector2) -> void:
 	var roles := ["striker", "escort", "defender"]
-	var offsets := [Vector2.ZERO, Vector2(74, -112), Vector2(74, 112)] if team == "cat" else [Vector2.ZERO, Vector2(-74, -112), Vector2(-74, 112)]
+	var offsets := [Vector2.ZERO, Vector2(120, -155), Vector2(120, 155)] if team == "cat" else [Vector2.ZERO, Vector2(-120, -155), Vector2(-120, 155)]
 	for i in range(keys.size()):
 		var pet := PetScript.new()
 		var controlled := team == player_team and i == 0
@@ -193,6 +204,25 @@ func _create_team(team: String, keys: Array, center: Vector2) -> void:
 			player_pet = pet
 
 
+func _create_camera() -> void:
+	camera = Camera2D.new()
+	camera.enabled = true
+	camera.limit_left = int(MAP_RECT.position.x)
+	camera.limit_top = int(MAP_RECT.position.y)
+	camera.limit_right = int(MAP_RECT.end.x)
+	camera.limit_bottom = int(MAP_RECT.end.y)
+	camera.position = player_pet.global_position if player_pet != null else CENTER_POS
+	add_child(camera)
+	camera.make_current()
+
+
+func _update_camera(delta: float) -> void:
+	if camera == null or player_pet == null:
+		return
+	var follow_speed = min(1.0, delta * 7.0)
+	camera.global_position = camera.global_position.lerp(player_pet.global_position, follow_speed)
+
+
 func _create_hud() -> void:
 	hud_layer = CanvasLayer.new()
 	add_child(hud_layer)
@@ -203,6 +233,8 @@ func _create_hud() -> void:
 	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	score_label.add_theme_font_size_override("font_size", 24)
 	score_label.add_theme_color_override("font_color", Color(0.15, 0.09, 0.06))
+	score_label.add_theme_color_override("font_outline_color", Color(0.99, 0.91, 0.72, 0.86))
+	score_label.add_theme_constant_override("outline_size", 4)
 	hud_layer.add_child(score_label)
 
 	status_label = Label.new()
@@ -211,6 +243,8 @@ func _create_hud() -> void:
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.add_theme_font_size_override("font_size", 16)
 	status_label.add_theme_color_override("font_color", Color(0.21, 0.14, 0.10))
+	status_label.add_theme_color_override("font_outline_color", Color(0.99, 0.91, 0.72, 0.86))
+	status_label.add_theme_constant_override("outline_size", 4)
 	hud_layer.add_child(status_label)
 
 	cooldown_label = Label.new()
@@ -218,6 +252,8 @@ func _create_hud() -> void:
 	cooldown_label.size = Vector2(390, 28)
 	cooldown_label.add_theme_font_size_override("font_size", 16)
 	cooldown_label.add_theme_color_override("font_color", Color(0.20, 0.13, 0.09))
+	cooldown_label.add_theme_color_override("font_outline_color", Color(0.99, 0.91, 0.72, 0.86))
+	cooldown_label.add_theme_constant_override("outline_size", 4)
 	hud_layer.add_child(cooldown_label)
 
 	objective_label = Label.new()
@@ -226,6 +262,8 @@ func _create_hud() -> void:
 	objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	objective_label.add_theme_font_size_override("font_size", 14)
 	objective_label.add_theme_color_override("font_color", Color(0.20, 0.13, 0.09))
+	objective_label.add_theme_color_override("font_outline_color", Color(0.99, 0.91, 0.72, 0.86))
+	objective_label.add_theme_constant_override("outline_size", 4)
 	hud_layer.add_child(objective_label)
 
 	event_label = Label.new()
@@ -234,6 +272,8 @@ func _create_hud() -> void:
 	event_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	event_label.add_theme_font_size_override("font_size", 20)
 	event_label.add_theme_color_override("font_color", Color(0.80, 0.18, 0.10))
+	event_label.add_theme_color_override("font_outline_color", Color(0.99, 0.91, 0.72, 0.92))
+	event_label.add_theme_constant_override("outline_size", 5)
 	hud_layer.add_child(event_label)
 
 	_create_touch_controls()
@@ -323,7 +363,7 @@ func _choose_ai_target(pet: Node) -> Vector2:
 	var enemy_carrier := _find_enemy_carrier(pet.team)
 	if enemy_carrier != null:
 		var danger_distance = enemy_carrier.global_position.distance_to(bases[pet.team].global_position)
-		if pet.role == "defender" or danger_distance < 470.0:
+		if pet.role == "defender" or danger_distance < 700.0:
 			return enemy_carrier.global_position
 
 	var allied_carrier := _find_allied_carrier(pet.team)
@@ -334,7 +374,7 @@ func _choose_ai_target(pet: Node) -> Vector2:
 		var repair := _closest_free_item(bases[pet.team].global_position, ["repair"])
 		if bases[pet.team].durability <= 3 and repair != null:
 			return repair.global_position
-		return bases[pet.team].global_position + Vector2(115, 0) * (1 if pet.team == "cat" else -1)
+		return bases[pet.team].global_position + Vector2(220, 0) * (1 if pet.team == "cat" else -1)
 
 	var boom := _closest_free_item(pet.global_position, ["boom"])
 	if boom != null:
@@ -347,7 +387,7 @@ func _choose_ai_target(pet: Node) -> Vector2:
 	var nearest_enemy := _nearest_enemy_pet(pet.global_position, pet.team, 9999.0)
 	if nearest_enemy != null:
 		return nearest_enemy.global_position
-	return Vector2(640, 360)
+	return CENTER_POS
 
 
 func _should_ai_skill(pet: Node, enemy: Node) -> bool:
@@ -460,8 +500,8 @@ func _process_item_bounds() -> void:
 func _tick_spawners(delta: float) -> void:
 	if boom_respawn_timer > 0.0:
 		boom_respawn_timer -= delta
-		if boom_respawn_timer <= 0.0 and _closest_free_item(Vector2(640, 360), ["boom"]) == null and _find_item_any("boom") == null:
-			_spawn_item("boom", Vector2(640, 360))
+		if boom_respawn_timer <= 0.0 and _closest_free_item(CENTER_POS, ["boom"]) == null and _find_item_any("boom") == null:
+			_spawn_item("boom", CENTER_POS)
 			_show_event("Boom Snack respawned in the center.")
 
 	aux_spawn_timer -= delta
