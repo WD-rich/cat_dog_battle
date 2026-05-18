@@ -23,7 +23,7 @@ static func pet_data(key: String) -> Dictionary:
 			"attack_cooldown": 0.56,
 			"skill_type": "dash",
 			"skill_cooldown": 4.8,
-			"description": "血厚能冲，适合正面抢炸弹、硬闯敌方窝。",
+			"description": "血厚能冲，适合正面抢罐头炸弹、硬闯敌方窝。",
 		},
 		"calico_cat": {
 			"key": "calico_cat",
@@ -38,7 +38,7 @@ static func pet_data(key: String) -> Dictionary:
 			"attack_cooldown": 0.45,
 			"skill_type": "sprint",
 			"skill_cooldown": 5.0,
-			"description": "速度最快，适合绕路偷炸弹、快速拆窝。",
+			"description": "速度最快，适合绕路偷罐头炸弹、快速拆窝。",
 		},
 		"ragdoll_cat": {
 			"key": "ragdoll_cat",
@@ -53,7 +53,7 @@ static func pet_data(key: String) -> Dictionary:
 			"attack_cooldown": 0.64,
 			"skill_type": "pulse",
 			"skill_cooldown": 5.8,
-			"description": "能把敌人推开，适合保护带炸弹的队友。",
+			"description": "能把敌人推开，适合保护抱罐头炸弹的队友。",
 		},
 		"shiba_dog": {
 			"key": "shiba_dog",
@@ -83,7 +83,7 @@ static func pet_data(key: String) -> Dictionary:
 			"attack_cooldown": 0.58,
 			"skill_type": "shield",
 			"skill_cooldown": 6.2,
-			"description": "血量高，能开盾护送炸弹进敌方窝。",
+			"description": "血量高，能开盾护送罐头炸弹进敌方窝。",
 		},
 		"husky_dog": {
 			"key": "husky_dog",

@@ -1,6 +1,8 @@
 extends Node2D
 class_name BattleItem
 
+const UI_FONT := preload("res://assets/fonts/NotoSansCJKsc-Regular.otf")
+
 var kind := "boom"
 var held_by: Node = null
 var pickup_lock := 0.0
@@ -11,6 +13,7 @@ var spin := 0.0
 var spawn_point := Vector2.ZERO
 
 var _sprite: Sprite2D
+var _label: Label
 
 const ITEM_TEXTURES := {
 	"boom": preload("res://assets/visuals/item_boom.svg"),
@@ -27,6 +30,18 @@ func _ready() -> void:
 	_sprite.scale = Vector2(0.62, 0.62)
 	_sprite.visible = false
 	add_child(_sprite)
+
+	_label = Label.new()
+	_label.text = _display_name()
+	_label.position = Vector2(-54, 34)
+	_label.size = Vector2(108, 24)
+	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_label.add_theme_font_override("font", UI_FONT)
+	_label.add_theme_font_size_override("font_size", 13)
+	_label.add_theme_color_override("font_color", Color(0.18, 0.11, 0.08))
+	_label.add_theme_color_override("font_outline_color", Color(1.0, 0.94, 0.72, 0.95))
+	_label.add_theme_constant_override("outline_size", 4)
+	add_child(_label)
 
 
 func setup(item_kind: String, start_position: Vector2) -> void:
@@ -113,6 +128,8 @@ func _process(delta: float) -> void:
 		var bob := sin(spin * 1.8) * 2.5
 		_sprite.position = Vector2(0, bob)
 		_sprite.rotation = sin(spin) * 0.08
+	if _label != null:
+		_label.visible = held_by == null
 	queue_redraw()
 
 
@@ -174,3 +191,17 @@ func _draw_filled_rect(rect: Rect2, color: Color) -> void:
 		rect.position + rect.size,
 		rect.position + Vector2(0, rect.size.y),
 	]), color)
+
+
+func _display_name() -> String:
+	if kind == "boom":
+		return "罐头炸弹"
+	if kind == "repair":
+		return "胶带卷"
+	if kind == "speed":
+		return "铃铛"
+	if kind == "shield":
+		return "抱枕盾"
+	if kind == "sock":
+		return "臭袜子"
+	return "道具"

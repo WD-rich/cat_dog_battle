@@ -57,6 +57,8 @@ var touch_controls: Control
 var result_panel: Panel
 var result_label: Label
 var guide_label: Label
+var control_hint_back: ColorRect
+var control_hint_label: Label
 
 var touch_up_held := false
 var touch_down_held := false
@@ -67,6 +69,7 @@ var touch_skill_held := false
 var touch_drop_requested := false
 var touch_move := Vector2.ZERO
 var drop_input_was_down := false
+var attack_input_was_down := false
 
 
 func _ready() -> void:
@@ -84,7 +87,7 @@ func _ready() -> void:
 	_spawn_item("shield", Vector2(1100, 940))
 	_spawn_item("speed", Vector2(1100, 300))
 	_spawn_item("sock", Vector2(1680, 620))
-	_show_event("开局保护 4 秒，先冲中场抢炸弹！")
+	_show_event("开局保护 4 秒，先冲中场抢罐头炸弹！")
 	update_hud()
 
 
@@ -327,6 +330,23 @@ func _create_hud() -> void:
 	guide_label.add_theme_constant_override("outline_size", 5)
 	hud_layer.add_child(guide_label)
 
+	control_hint_back = ColorRect.new()
+	control_hint_back.position = Vector2(18, 92)
+	control_hint_back.size = Vector2(386, 154)
+	control_hint_back.color = Color(1.0, 0.96, 0.78, 0.82)
+	hud_layer.add_child(control_hint_back)
+
+	control_hint_label = Label.new()
+	control_hint_label.position = Vector2(32, 104)
+	control_hint_label.size = Vector2(358, 132)
+	control_hint_label.add_theme_font_override("font", UI_FONT)
+	control_hint_label.add_theme_font_size_override("font_size", 17)
+	control_hint_label.add_theme_color_override("font_color", Color(0.20, 0.12, 0.08))
+	control_hint_label.add_theme_color_override("font_outline_color", Color(1.0, 0.96, 0.78, 0.92))
+	control_hint_label.add_theme_constant_override("outline_size", 3)
+	control_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hud_layer.add_child(control_hint_label)
+
 	_create_touch_controls()
 
 	result_panel = Panel.new()
@@ -366,15 +386,28 @@ func _handle_player_input() -> void:
 	elif dir.length() > 0.1:
 		player_pet.aim_direction = dir.normalized()
 
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_key_pressed(KEY_J) or touch_attack_held:
-		player_pet.try_attack()
+	var attack_down := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_key_pressed(KEY_J) or touch_attack_held
+	if attack_down:
+		var attack_was_ready: bool = player_pet.attack_timer <= 0.0
+		var attacked: bool = player_pet.try_attack()
+		if not attack_input_was_down and attack_was_ready and not attacked:
+			_show_event("攻击要贴近敌人或道具：J 键 / 鼠标左键")
+	attack_input_was_down = attack_down
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or Input.is_key_pressed(KEY_K) or touch_skill_held:
 		player_pet.try_skill()
 	var drop_down := Input.is_key_pressed(KEY_E) or touch_drop_requested
 	if drop_down and not drop_input_was_down:
-		player_pet.drop_or_throw_carried()
 		if player_pet.carried_item == null:
-			_show_event("已丢下道具")
+			_show_event("还没拿道具：靠近道具会自动拾取")
+		else:
+			var dropped_kind: String = player_pet.carried_item.kind
+			player_pet.drop_or_throw_carried()
+			if dropped_kind == "sock":
+				_show_event("臭袜子扔出去了！")
+			elif dropped_kind == "boom":
+				_show_event("已放下罐头炸弹")
+			else:
+				_show_event("已放下%s" % _item_name(dropped_kind))
 		touch_drop_requested = false
 	drop_input_was_down = drop_down
 
@@ -540,16 +573,16 @@ func _process_item_pickups() -> void:
 				if nearby_boom != null:
 					pet.carried_item.drop(pet.global_position - pet.aim_direction.normalized() * 42.0, 1.2)
 					nearby_boom.pickup(pet)
-					_show_event("%s 抢到炸弹！" % pet.display_name)
+					_show_event("%s 抢到罐头炸弹！" % pet.display_name)
 			continue
 		var closest := _best_pickup_item(pet, 42.0)
 		if closest != null:
 			var was_carry_item = closest.is_carry_item()
 			if closest.pickup(pet):
 				if closest.kind == "boom":
-					_show_event("%s 抢到炸弹，去炸%s！" % [pet.display_name, _base_name(_other_team(pet.team))])
+					_show_event("%s 抱起罐头炸弹，去拆%s！" % [pet.display_name, _base_name(_other_team(pet.team))])
 				elif closest.kind == "repair":
-					_show_event("%s 捡到修理罐，回窝可回血。" % pet.display_name)
+					_show_event("%s 捡到胶带卷，回窝可修家。" % pet.display_name)
 			if not was_carry_item:
 				items.erase(closest)
 
@@ -584,7 +617,7 @@ func _tick_spawners(delta: float) -> void:
 		boom_respawn_timer -= delta
 		if boom_respawn_timer <= 0.0 and _closest_free_item(CENTER_POS, ["boom"]) == null and _find_item_any("boom") == null:
 			_spawn_item("boom", CENTER_POS)
-			_show_event("炸弹回到中场了！")
+			_show_event("罐头炸弹回到中场了！")
 
 	aux_spawn_timer -= delta
 	if aux_spawn_timer <= 0.0:
@@ -660,13 +693,18 @@ func update_hud() -> void:
 		]
 	if elapsed < OPENING_GRACE_SECONDS:
 		var grace_left := int(ceil(OPENING_GRACE_SECONDS - elapsed))
-		objective_label.text = "开局保护 %d 秒：冲向中场抢炸弹" % grace_left
+		objective_label.text = "开局保护 %d 秒：冲向中场抢罐头炸弹" % grace_left
 	else:
-		objective_label.text = "带炸弹进敌方窝，别让对面炸你家"
+		objective_label.text = "带罐头炸弹进敌方窝，别让对面拆你家"
 	event_label.text = last_event if event_timer > 0.0 else ""
-	status_label.text = "炸弹拆窝｜修理罐回血｜铃铛加速｜盾牌护送｜袜子丢出减速"
+	status_label.text = "罐头炸弹拆窝｜胶带卷修家｜铃铛加速｜抱枕盾护送｜臭袜子丢出减速"
 	if guide_label != null:
 		guide_label.text = _guide_text()
+	if control_hint_label != null:
+		control_hint_label.text = _control_hint_text()
+		var show_hint := elapsed < 28.0 or (player_pet != null and player_pet.carried_item != null)
+		control_hint_label.visible = show_hint
+		control_hint_back.visible = show_hint
 
 
 func _show_event(message: String) -> void:
@@ -674,18 +712,31 @@ func _show_event(message: String) -> void:
 	event_timer = 2.8
 
 
+func _control_hint_text() -> String:
+	if player_pet == null:
+		return ""
+	if player_pet.carried_item != null:
+		if player_pet.carried_item.kind == "boom":
+			return "你抱着罐头炸弹\n跑进敌方宠物窝 = 拆 1 格\nE 键：放下罐头炸弹\nJ 键 / 左键：打飞拦路宠物"
+		if player_pet.carried_item.kind == "sock":
+			return "你拿着臭袜子\n面向敌人按 E 键 = 投掷减速\nJ 键 / 左键：近身攻击\nK 键 / 右键：使用技能"
+		if player_pet.carried_item.kind == "repair":
+			return "你拿着胶带卷\n跑回自家宠物窝 = 修 1 格\nE 键：放下胶带卷\nJ 键 / 左键：近身攻击"
+	return "操作提示\n移动：W A S D 键 / 方向键\n攻击：J 键 / 鼠标左键，打敌人或踢道具\n丢弃 / 投掷：E 键，没拿道具时不会生效"
+
+
 func _guide_text() -> String:
 	if player_pet == null:
 		return ""
 	var target: Vector2 = CENTER_POS
-	var verb := "抢炸弹"
+	var verb := "抢罐头炸弹"
 	var carrier := _find_enemy_carrier(player_team)
 	if player_pet.carried_item != null and player_pet.carried_item.kind == "boom":
 		target = bases[enemy_team].global_position
 		verb = "去炸%s" % _base_name(enemy_team)
 	elif carrier != null:
 		target = carrier.global_position
-		verb = "拦截炸弹"
+		verb = "拦截罐头炸弹"
 	else:
 		var boom := _find_item_any("boom")
 		if boom != null:
@@ -828,17 +879,17 @@ func _create_touch_controls() -> void:
 		_update_touch_move()
 	)
 
-	_add_touch_button("打", Vector2(1054, 530), Vector2(82, 58), func() -> void:
+	_add_touch_button("攻击", Vector2(1034, 530), Vector2(102, 58), func() -> void:
 		touch_attack_held = true
 	, func() -> void:
 		touch_attack_held = false
 	)
-	_add_touch_button("技", Vector2(1150, 478), Vector2(82, 58), func() -> void:
+	_add_touch_button("技能", Vector2(1150, 478), Vector2(96, 58), func() -> void:
 		touch_skill_held = true
 	, func() -> void:
 		touch_skill_held = false
 	)
-	_add_touch_button("丢", Vector2(1150, 598), Vector2(82, 58), func() -> void:
+	_add_touch_button("丢弃", Vector2(1150, 598), Vector2(96, 58), func() -> void:
 		touch_drop_requested = true
 	, func() -> void:
 		pass
@@ -871,7 +922,7 @@ func _update_touch_move() -> void:
 
 
 func _should_show_touch_controls() -> bool:
-	return DisplayServer.is_touchscreen_available() or OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("mobile")
+	return false
 
 
 func clamp_to_map(point: Vector2) -> Vector2:
@@ -887,15 +938,15 @@ func _is_opening_protected(attacker: Node, target: Node) -> bool:
 
 func _item_name(kind: String) -> String:
 	if kind == "boom":
-		return "炸弹"
+		return "罐头炸弹"
 	if kind == "repair":
-		return "修理罐"
+		return "胶带卷"
 	if kind == "speed":
 		return "铃铛"
 	if kind == "shield":
-		return "盾牌"
+		return "抱枕盾"
 	if kind == "sock":
-		return "袜子"
+		return "臭袜子"
 	return "道具"
 
 

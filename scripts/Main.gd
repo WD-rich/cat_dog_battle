@@ -173,14 +173,14 @@ func _build_menu() -> void:
 
 	right.add_child(_make_label("本局目标", 28, Color(0.18, 0.10, 0.07), HORIZONTAL_ALIGNMENT_LEFT))
 
-	var rules := _make_label("1. 开局冲向客厅中场，抢到闪光炸弹。\n2. 带炸弹闯进敌方宠物窝，炸掉一格耐久。\n3. 修理罐只在自家受损时有用，炸弹永远优先。\n4. 铃铛加速，盾牌护送，臭袜子可以丢出去减速。\n5. 先把对方宠物窝拆掉就赢。", 18, Color(0.25, 0.15, 0.10), HORIZONTAL_ALIGNMENT_LEFT)
+	var rules := _make_label("1. 开局冲向客厅中场，抢到罐头炸弹。\n2. 抱着罐头炸弹闯进敌方宠物窝，拆掉一格耐久。\n3. 胶带卷只在自家受损时有用，罐头炸弹永远优先。\n4. 铃铛加速，抱枕盾护送，臭袜子可以丢出去减速。\n5. 先把对方宠物窝拆掉就赢。", 18, Color(0.25, 0.15, 0.10), HORIZONTAL_ALIGNMENT_LEFT)
 	rules.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	rules.custom_minimum_size = Vector2(540, 190)
 	right.add_child(rules)
 
-	var controls := _make_label("操作\n移动：方向键或左手移动键\n普攻：攻击键或鼠标左键\n技能：技能键或鼠标右键\n丢弃/投掷：丢弃键", 17, Color(0.19, 0.27, 0.36), HORIZONTAL_ALIGNMENT_LEFT)
+	var controls := _make_label("操作\n移动：W A S D 键或方向键\n攻击：J 键或鼠标左键，打敌人，也能踢地上的道具\n技能：K 键或鼠标右键\n丢弃/投掷：E 键，拿罐头炸弹是放下，拿臭袜子是扔出", 17, Color(0.19, 0.27, 0.36), HORIZONTAL_ALIGNMENT_LEFT)
 	controls.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	controls.custom_minimum_size = Vector2(540, 120)
+	controls.custom_minimum_size = Vector2(540, 150)
 	right.add_child(controls)
 
 	var result := _make_label("", 17, Color(0.24, 0.14, 0.09), HORIZONTAL_ALIGNMENT_LEFT)
