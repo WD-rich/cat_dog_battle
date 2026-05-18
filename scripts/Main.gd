@@ -158,7 +158,7 @@ func _build_menu() -> void:
 
 	var avatar := TextureRect.new()
 	avatar.texture = PET_TEXTURES.get(selected_pet_key)
-	avatar.custom_minimum_size = Vector2(150, 150)
+	avatar.custom_minimum_size = Vector2(172, 172)
 	avatar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	preview_row.add_child(avatar)
@@ -167,7 +167,7 @@ func _build_menu() -> void:
 		selected_data.get("name", selected_pet_key),
 		selected_data.get("description", "")
 	], 20, Color(0.20, 0.11, 0.07), HORIZONTAL_ALIGNMENT_LEFT)
-	preview_text.custom_minimum_size = Vector2(370, 150)
+	preview_text.custom_minimum_size = Vector2(348, 172)
 	preview_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview_row.add_child(preview_text)
 
@@ -178,7 +178,7 @@ func _build_menu() -> void:
 	rules.custom_minimum_size = Vector2(540, 190)
 	right.add_child(rules)
 
-	var controls := _make_label("操作\n移动：W A S D 键或方向键\n攻击：J 键或鼠标左键，打敌人，也能踢地上的道具\n技能：K 键或鼠标右键\n丢弃/投掷：E 键，拿罐头炸弹是放下，拿臭袜子是扔出", 17, Color(0.19, 0.27, 0.36), HORIZONTAL_ALIGNMENT_LEFT)
+	var controls := _make_label("操作\n移动：W A S D 键或方向键\nJ 键 / 鼠标左键：拍打敌人，也能踢地上的道具\nK 键 / 鼠标右键：使用技能\nE 键：使用手上道具；臭袜子会投掷，罐头炸弹和胶带卷会放下", 17, Color(0.19, 0.27, 0.36), HORIZONTAL_ALIGNMENT_LEFT)
 	controls.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	controls.custom_minimum_size = Vector2(540, 150)
 	right.add_child(controls)
@@ -265,6 +265,9 @@ func _make_pet_button(key: String) -> Button:
 		GameState.get_pet_level(key),
 		data.get("role", "")
 	])
+	button.icon = PET_TEXTURES.get(key)
+	button.expand_icon = true
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.custom_minimum_size = Vector2(512, 46)
 	button.toggle_mode = true
 	button.button_pressed = selected_pet_key == key

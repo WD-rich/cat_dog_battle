@@ -46,6 +46,8 @@ var defeated := false
 var dash_hit_targets: Array = []
 var ai_target_position := Vector2.ZERO
 var ai_think_timer := 0.0
+var attack_flash_timer := 0.0
+var throw_flash_timer := 0.0
 
 var _shape: CollisionShape2D
 var _name_label: Label
@@ -100,7 +102,7 @@ func _ready() -> void:
 
 	_sprite = Sprite2D.new()
 	_sprite.texture = PET_TEXTURES.get(pet_key)
-	_sprite.scale = Vector2(0.62, 0.62)
+	_sprite.scale = Vector2(0.78, 0.78)
 	_sprite.position = Vector2(0, 5)
 	_sprite.visible = false
 	add_child(_sprite)
@@ -111,8 +113,8 @@ func _ready() -> void:
 	_name_label.add_theme_font_override("font", UI_FONT)
 	_name_label.add_theme_font_size_override("font_size", 12)
 	_name_label.add_theme_color_override("font_color", Color(0.13, 0.09, 0.07))
-	_name_label.position = Vector2(-58, -64)
-	_name_label.size = Vector2(116, 20)
+	_name_label.position = Vector2(-66, -82)
+	_name_label.size = Vector2(132, 22)
 	add_child(_name_label)
 	_update_label()
 
@@ -149,6 +151,8 @@ func _tick_timers(delta: float) -> void:
 	speed_timer = max(0.0, speed_timer - delta)
 	slow_timer = max(0.0, slow_timer - delta)
 	dash_timer = max(0.0, dash_timer - delta)
+	attack_flash_timer = max(0.0, attack_flash_timer - delta)
+	throw_flash_timer = max(0.0, throw_flash_timer - delta)
 	if speed_timer <= 0.0:
 		speed_multiplier = 1.0
 	if slow_timer <= 0.0:
@@ -160,8 +164,10 @@ func _tick_timers(delta: float) -> void:
 func try_attack() -> bool:
 	if defeated or attack_timer > 0.0 or battle == null:
 		return false
-	attack_timer = attack_cooldown
-	return battle.pet_attack(self)
+	attack_flash_timer = 0.16
+	var did_hit: bool = battle.pet_attack(self)
+	attack_timer = attack_cooldown if did_hit else 0.10
+	return did_hit
 
 
 func try_skill() -> bool:
@@ -226,10 +232,16 @@ func add_slow(duration: float) -> void:
 func drop_or_throw_carried() -> void:
 	if carried_item == null:
 		return
+	throw_flash_timer = 0.18
+	var direction := aim_direction
+	if battle != null and battle.has_method("get_assisted_throw_direction"):
+		direction = battle.get_assisted_throw_direction(self, direction)
 	if carried_item.kind == "sock":
-		carried_item.throw_from(self, aim_direction)
+		carried_item.throw_from(self, direction)
 	else:
-		carried_item.drop(global_position + aim_direction.normalized() * 54.0, 1.2)
+		if direction.length() < 0.1:
+			direction = Vector2.RIGHT if team == "cat" else Vector2.LEFT
+		carried_item.drop(global_position + direction.normalized() * 62.0, 1.2)
 
 
 func _knock_out() -> void:
@@ -268,10 +280,12 @@ func _draw() -> void:
 	var accent := Color(accent_color.r, accent_color.g, accent_color.b, alpha)
 	var has_sprite := _sprite != null and _sprite.texture != null
 
-	draw_circle(Vector2(4, 12), 30, Color(0, 0, 0, 0.16 * alpha))
+	draw_circle(Vector2(5, 17), 38, Color(0, 0, 0, 0.15 * alpha))
+	draw_circle(Vector2(0, -7), 43, Color(1.0, 0.96, 0.78, 0.18 * alpha))
 
 	if has_sprite:
-		draw_texture_rect(_sprite.texture, Rect2(Vector2(-43, -48), Vector2(86, 86)), false, Color(1, 1, 1, alpha))
+		var bob := sin(Time.get_ticks_msec() / 260.0 + float(get_instance_id() % 7)) * 1.6
+		draw_texture_rect(_sprite.texture, Rect2(Vector2(-55, -66 + bob), Vector2(110, 110)), false, Color(1, 1, 1, alpha))
 	else:
 		if team == "cat":
 			draw_polygon(PackedVector2Array([Vector2(-25, -18), Vector2(-17, -42), Vector2(-3, -21)]), PackedColorArray([body, body, body]))
@@ -292,7 +306,27 @@ func _draw() -> void:
 		draw_arc(Vector2(0, 10), 10, 0.15, PI - 0.15, 18, outline, 2.0)
 
 	if is_player:
-		draw_circle(Vector2.ZERO, 35, Color(1.0, 0.95, 0.30, 0.32), false, 4.0)
+		draw_circle(Vector2(0, -5), 48, Color(1.0, 0.95, 0.30, 0.28), false, 5.0)
+
+	if attack_flash_timer > 0.0:
+		var slash_alpha: float = clamp(attack_flash_timer / 0.16, 0.0, 1.0)
+		var dir: Vector2 = aim_direction.normalized()
+		if dir.length() < 0.1:
+			dir = Vector2.RIGHT if team == "cat" else Vector2.LEFT
+		var center: Vector2 = dir * 48.0 + Vector2(0, -9)
+		var angle: float = dir.angle()
+		draw_arc(center, 24.0 + (1.0 - slash_alpha) * 14.0, angle - 1.05, angle + 1.05, 18, Color(1.0, 0.90, 0.30, 0.88 * slash_alpha), 6.0)
+		draw_arc(center, 15.0 + (1.0 - slash_alpha) * 10.0, angle - 0.72, angle + 0.72, 14, Color(1.0, 1.0, 1.0, 0.65 * slash_alpha), 3.0)
+
+	if throw_flash_timer > 0.0:
+		var throw_alpha: float = clamp(throw_flash_timer / 0.18, 0.0, 1.0)
+		var dir: Vector2 = aim_direction.normalized()
+		if dir.length() < 0.1:
+			dir = Vector2.RIGHT if team == "cat" else Vector2.LEFT
+		var start: Vector2 = Vector2(0, -15)
+		var finish: Vector2 = start + dir * (58.0 + (1.0 - throw_alpha) * 22.0)
+		draw_line(start, finish, Color(0.25, 0.13, 0.08, 0.38 * throw_alpha), 8.0)
+		draw_line(start, finish, Color(1.0, 0.83, 0.23, 0.82 * throw_alpha), 4.0)
 
 	if carried_item != null and carried_item.kind == "boom":
 		var pulse := 1.0 + sin(Time.get_ticks_msec() / 110.0) * 0.10
@@ -309,8 +343,8 @@ func _draw() -> void:
 
 	var bar_width := 58.0
 	var hp_ratio: float = clamp(hp / max_hp, 0.0, 1.0)
-	_draw_filled_rect(Rect2(Vector2(-bar_width / 2.0, -54), Vector2(bar_width, 7)), Color(0.18, 0.11, 0.09, 0.85))
-	_draw_filled_rect(Rect2(Vector2(-bar_width / 2.0 + 1, -53), Vector2((bar_width - 2) * hp_ratio, 5)), Color(0.30, 0.95, 0.38))
+	_draw_filled_rect(Rect2(Vector2(-bar_width / 2.0, -66), Vector2(bar_width, 7)), Color(0.18, 0.11, 0.09, 0.85))
+	_draw_filled_rect(Rect2(Vector2(-bar_width / 2.0 + 1, -65), Vector2((bar_width - 2) * hp_ratio, 5)), Color(0.30, 0.95, 0.38))
 
 	if carried_item != null:
 		draw_line(Vector2(0, -28), Vector2(0, -40), outline, 2.0)

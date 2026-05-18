@@ -96,10 +96,10 @@ func throw_from(pet: Node, direction: Vector2) -> void:
 		held_by.carried_item = null
 	thrown_by_team = pet.team
 	held_by = null
-	global_position = pet.global_position + direction.normalized() * 34.0
-	throw_velocity = direction.normalized() * 760.0
-	projectile_time = 1.0
-	pickup_lock = 0.45
+	global_position = pet.global_position + direction.normalized() * 46.0
+	throw_velocity = direction.normalized() * 940.0
+	projectile_time = 1.15
+	pickup_lock = 0.50
 
 
 func kick(direction: Vector2, force := 560.0) -> void:
@@ -118,7 +118,8 @@ func _process(delta: float) -> void:
 		global_position = held_by.global_position + Vector2(0, -40)
 	else:
 		global_position += throw_velocity * delta
-		throw_velocity = throw_velocity.move_toward(Vector2.ZERO, 880.0 * delta)
+		var drag := 620.0 if projectile_time > 0.0 else 900.0
+		throw_velocity = throw_velocity.move_toward(Vector2.ZERO, drag * delta)
 		if projectile_time > 0.0:
 			projectile_time = max(0.0, projectile_time - delta)
 		if pickup_lock > 0.0:
@@ -134,6 +135,11 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
+	if projectile_time > 0.0 and throw_velocity.length() > 10.0:
+		var trail_dir := -throw_velocity.normalized()
+		draw_line(trail_dir * 52.0, trail_dir * 14.0, Color(0.25, 0.13, 0.08, 0.30), 9.0)
+		draw_line(trail_dir * 48.0, trail_dir * 10.0, Color(1.0, 0.92, 0.38, 0.62), 5.0)
+
 	if kind == "boom":
 		var pulse := 1.0 + sin(spin * 3.2) * 0.12
 		draw_circle(Vector2(0, -1), 36.0 * pulse, Color(1.0, 0.72, 0.10, 0.24))

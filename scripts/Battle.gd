@@ -391,7 +391,7 @@ func _handle_player_input() -> void:
 		var attack_was_ready: bool = player_pet.attack_timer <= 0.0
 		var attacked: bool = player_pet.try_attack()
 		if not attack_input_was_down and attack_was_ready and not attacked:
-			_show_event("攻击要贴近敌人或道具：J 键 / 鼠标左键")
+			_show_event("J 键是拍打：贴近敌人或地上道具再按")
 	attack_input_was_down = attack_down
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or Input.is_key_pressed(KEY_K) or touch_skill_held:
 		player_pet.try_skill()
@@ -403,11 +403,11 @@ func _handle_player_input() -> void:
 			var dropped_kind: String = player_pet.carried_item.kind
 			player_pet.drop_or_throw_carried()
 			if dropped_kind == "sock":
-				_show_event("臭袜子扔出去了！")
+				_show_event("E 键投出了臭袜子！")
 			elif dropped_kind == "boom":
-				_show_event("已放下罐头炸弹")
+				_show_event("E 键已放下罐头炸弹")
 			else:
-				_show_event("已放下%s" % _item_name(dropped_kind))
+				_show_event("E 键已放下%s" % _item_name(dropped_kind))
 		touch_drop_requested = false
 	drop_input_was_down = drop_down
 
@@ -497,20 +497,49 @@ func _should_ai_skill(pet: Node, enemy: Node) -> bool:
 
 
 func pet_attack(attacker: Node) -> bool:
-	var target := _nearest_enemy_pet(attacker.global_position, attacker.team, attacker.attack_range)
+	var range_bonus := 22.0 if attacker == player_pet else 12.0
+	var target := _nearest_enemy_pet(attacker.global_position, attacker.team, attacker.attack_range + range_bonus)
 	if target != null and not _is_opening_protected(attacker, target):
 		var dir = (target.global_position - attacker.global_position).normalized()
 		target.take_damage(attacker.attack_damage, dir * 330.0, attacker)
+		_show_action_pop(target.global_position + Vector2(0, -48), "啪！", Color(1.0, 0.82, 0.22))
 		return true
 
-	var item := _nearest_free_item(attacker.global_position, attacker.attack_range + 8.0)
+	var item := _nearest_free_item(attacker.global_position, attacker.attack_range + 28.0)
 	if item != null:
 		var dir = attacker.aim_direction.normalized()
 		if dir.length() < 0.1:
 			dir = (item.global_position - attacker.global_position).normalized()
 		item.kick(dir, 610.0)
+		_show_action_pop(item.global_position + Vector2(0, -34), "踢！", Color(1.0, 0.68, 0.18))
 		return true
 	return false
+
+
+func get_assisted_throw_direction(pet: Node, fallback: Vector2) -> Vector2:
+	var base_dir := fallback.normalized()
+	if base_dir.length() < 0.1:
+		base_dir = Vector2.RIGHT if pet.team == "cat" else Vector2.LEFT
+	var best: Node = null
+	var best_score := 99999.0
+	for target in pets:
+		if target.team == pet.team or target.defeated:
+			continue
+		if _is_opening_protected(pet, target):
+			continue
+		var offset: Vector2 = target.global_position - pet.global_position
+		var distance := offset.length()
+		if distance > 520.0 or distance < 1.0:
+			continue
+		var angle_penalty: float = abs(base_dir.angle_to(offset.normalized())) * 115.0
+		var carrier_bonus: float = -90.0 if target.carried_item != null and target.carried_item.kind == "boom" else 0.0
+		var score: float = distance + angle_penalty + carrier_bonus
+		if score < best_score:
+			best_score = score
+			best = target
+	if best != null:
+		return (best.global_position - pet.global_position).normalized()
+	return base_dir
 
 
 func area_burst(source: Node, radius: float, damage: float, knock_force: float) -> void:
@@ -555,10 +584,11 @@ func _process_sock_hits() -> void:
 				continue
 			if elapsed < OPENING_GRACE_SECONDS and pet == player_pet:
 				continue
-			if pet.global_position.distance_to(item.global_position) <= 34.0:
+			if pet.global_position.distance_to(item.global_position) <= 42.0:
 				var dir = (pet.global_position - item.global_position).normalized()
 				pet.take_damage(5.0, dir * 260.0, null)
 				pet.add_slow(2.2)
+				_show_action_pop(pet.global_position + Vector2(0, -54), "臭袜子命中", Color(0.55, 0.86, 0.32))
 				_consume_item(item)
 				break
 
@@ -697,7 +727,7 @@ func update_hud() -> void:
 	else:
 		objective_label.text = "带罐头炸弹进敌方窝，别让对面拆你家"
 	event_label.text = last_event if event_timer > 0.0 else ""
-	status_label.text = "罐头炸弹拆窝｜胶带卷修家｜铃铛加速｜抱枕盾护送｜臭袜子丢出减速"
+	status_label.text = "J 拍打/踢道具｜E 使用手上道具｜罐头炸弹拆窝｜胶带卷修家"
 	if guide_label != null:
 		guide_label.text = _guide_text()
 	if control_hint_label != null:
@@ -717,12 +747,12 @@ func _control_hint_text() -> String:
 		return ""
 	if player_pet.carried_item != null:
 		if player_pet.carried_item.kind == "boom":
-			return "你抱着罐头炸弹\n跑进敌方宠物窝 = 拆 1 格\nE 键：放下罐头炸弹\nJ 键 / 左键：打飞拦路宠物"
+			return "你抱着罐头炸弹\n跑进敌方宠物窝 = 拆 1 格\nE 键：放下罐头炸弹\nJ 键 / 左键：拍打拦路宠物"
 		if player_pet.carried_item.kind == "sock":
-			return "你拿着臭袜子\n面向敌人按 E 键 = 投掷减速\nJ 键 / 左键：近身攻击\nK 键 / 右键：使用技能"
+			return "你拿着臭袜子\nE 键：朝附近敌人投掷减速\nJ 键 / 左键：近身拍打\nK 键 / 右键：使用技能"
 		if player_pet.carried_item.kind == "repair":
-			return "你拿着胶带卷\n跑回自家宠物窝 = 修 1 格\nE 键：放下胶带卷\nJ 键 / 左键：近身攻击"
-	return "操作提示\n移动：W A S D 键 / 方向键\n攻击：J 键 / 鼠标左键，打敌人或踢道具\n丢弃 / 投掷：E 键，没拿道具时不会生效"
+			return "你拿着胶带卷\n跑回自家宠物窝 = 修 1 格\nE 键：放下胶带卷\nJ 键 / 左键：近身拍打"
+	return "操作提示\n移动：W A S D 键 / 方向键\nJ 键 / 鼠标左键：拍打敌人，或踢地上道具\nE 键：使用手上道具；没拿道具时不会生效"
 
 
 func _guide_text() -> String:
@@ -797,6 +827,26 @@ func show_hit_feedback(pos: Vector2, amount: int, target_team: String) -> void:
 	var tween := create_tween()
 	tween.tween_property(label, "position", label.position + Vector2(0, -34), 0.45)
 	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.45)
+	tween.tween_callback(label.queue_free)
+
+
+func _show_action_pop(pos: Vector2, text: String, color: Color) -> void:
+	var label := Label.new()
+	label.text = text
+	label.z_index = 125
+	label.position = pos + Vector2(-60, -18)
+	label.size = Vector2(120, 32)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_override("font", UI_FONT)
+	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color(0.20, 0.12, 0.08, 0.95))
+	label.add_theme_constant_override("outline_size", 4)
+	add_child(label)
+	var tween := create_tween()
+	tween.tween_property(label, "position", label.position + Vector2(0, -28), 0.38)
+	tween.parallel().tween_property(label, "scale", Vector2(1.10, 1.10), 0.18)
+	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.38)
 	tween.tween_callback(label.queue_free)
 
 
