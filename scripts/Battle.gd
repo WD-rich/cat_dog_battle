@@ -387,7 +387,12 @@ func _create_hud() -> void:
 
 
 func _handle_player_input() -> void:
-	if player_pet == null or player_pet.defeated:
+	if player_pet == null:
+		_clear_pending_inputs()
+		return
+	if player_pet.defeated:
+		player_pet.desired_move = Vector2.ZERO
+		_clear_pending_inputs()
 		return
 	var dir := Vector2.ZERO
 	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
@@ -438,6 +443,18 @@ func _handle_player_input() -> void:
 		touch_drop_requested = false
 	drop_input_was_down = drop_down
 	drop_requested = false
+
+
+func _clear_pending_inputs() -> void:
+	attack_requested = false
+	skill_requested = false
+	drop_requested = false
+	attack_input_was_down = false
+	skill_input_was_down = false
+	drop_input_was_down = false
+	touch_attack_held = false
+	touch_skill_held = false
+	touch_drop_requested = false
 
 
 func _drive_ai(pet: Node, delta: float) -> void:
