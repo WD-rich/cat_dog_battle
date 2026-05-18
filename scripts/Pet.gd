@@ -48,6 +48,7 @@ var ai_target_position := Vector2.ZERO
 var ai_think_timer := 0.0
 var attack_flash_timer := 0.0
 var throw_flash_timer := 0.0
+var skill_flash_timer := 0.0
 
 var _shape: CollisionShape2D
 var _name_label: Label
@@ -153,6 +154,7 @@ func _tick_timers(delta: float) -> void:
 	dash_timer = max(0.0, dash_timer - delta)
 	attack_flash_timer = max(0.0, attack_flash_timer - delta)
 	throw_flash_timer = max(0.0, throw_flash_timer - delta)
+	skill_flash_timer = max(0.0, skill_flash_timer - delta)
 	if speed_timer <= 0.0:
 		speed_multiplier = 1.0
 	if slow_timer <= 0.0:
@@ -174,6 +176,7 @@ func try_skill() -> bool:
 	if defeated or skill_timer > 0.0 or battle == null:
 		return false
 	skill_timer = skill_cooldown_max
+	skill_flash_timer = 0.34
 
 	if skill_type == "shield":
 		add_shield(2.8)
@@ -181,16 +184,28 @@ func try_skill() -> bool:
 	elif skill_type == "pulse":
 		battle.area_burst(self, 96.0, 16.0, 390.0)
 	elif skill_type == "sprint":
-		add_speed_boost(2.4)
+		add_speed_boost(3.0)
+		var sprint_dir := _skill_direction()
+		dash_velocity = sprint_dir * 520.0
+		dash_timer = 0.18
 		battle.area_burst(self, 54.0, 7.0, 260.0)
 	else:
-		var dir := aim_direction.normalized()
-		if dir.length() < 0.1:
-			dir = Vector2.RIGHT if team == "cat" else Vector2.LEFT
-		dash_velocity = dir * 780.0
-		dash_timer = 0.26
+		var dir := _skill_direction()
+		dash_velocity = dir * 980.0
+		dash_timer = 0.34
 		dash_hit_targets.clear()
+	if battle.has_method("pet_skill_used"):
+		battle.pet_skill_used(self)
 	return true
+
+
+func _skill_direction() -> Vector2:
+	var dir := desired_move.normalized()
+	if dir.length() < 0.1:
+		dir = aim_direction.normalized()
+	if dir.length() < 0.1:
+		dir = Vector2.RIGHT if team == "cat" else Vector2.LEFT
+	return dir
 
 
 func take_damage(amount: float, impulse: Vector2, source: Node = null) -> void:
@@ -307,6 +322,21 @@ func _draw() -> void:
 
 	if is_player:
 		draw_circle(Vector2(0, -5), 48, Color(1.0, 0.95, 0.30, 0.28), false, 5.0)
+
+	if skill_flash_timer > 0.0:
+		var skill_alpha: float = clamp(skill_flash_timer / 0.34, 0.0, 1.0)
+		var radius := 46.0 + (1.0 - skill_alpha) * 30.0
+		var flash_color := Color(0.32, 0.68, 1.0, 0.62 * skill_alpha)
+		if skill_type == "dash":
+			flash_color = Color(1.0, 0.68, 0.18, 0.70 * skill_alpha)
+		elif skill_type == "sprint":
+			flash_color = Color(1.0, 0.90, 0.20, 0.70 * skill_alpha)
+		elif skill_type == "shield":
+			flash_color = Color(0.34, 0.74, 1.0, 0.68 * skill_alpha)
+		elif skill_type == "pulse":
+			flash_color = Color(0.78, 0.52, 1.0, 0.68 * skill_alpha)
+		draw_circle(Vector2(0, -7), radius, flash_color, false, 7.0)
+		draw_circle(Vector2(0, -7), radius * 0.64, Color(1.0, 1.0, 1.0, 0.30 * skill_alpha), false, 3.0)
 
 	if attack_flash_timer > 0.0:
 		var slash_alpha: float = clamp(attack_flash_timer / 0.16, 0.0, 1.0)

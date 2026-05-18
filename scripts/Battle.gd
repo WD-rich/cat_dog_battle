@@ -70,6 +70,10 @@ var touch_drop_requested := false
 var touch_move := Vector2.ZERO
 var drop_input_was_down := false
 var attack_input_was_down := false
+var skill_input_was_down := false
+var attack_requested := false
+var skill_requested := false
+var drop_requested := false
 
 
 func _ready() -> void:
@@ -89,6 +93,23 @@ func _ready() -> void:
 	_spawn_item("sock", Vector2(1680, 620))
 	_show_event("开局保护 4 秒，先冲中场抢罐头炸弹！")
 	update_hud()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if match_over:
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_J or event.physical_keycode == KEY_J:
+			attack_requested = true
+		elif event.keycode == KEY_K or event.physical_keycode == KEY_K:
+			skill_requested = true
+		elif event.keycode == KEY_E or event.physical_keycode == KEY_E:
+			drop_requested = true
+	if event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			attack_requested = true
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			skill_requested = true
 
 
 func _physics_process(delta: float) -> void:
@@ -386,17 +407,23 @@ func _handle_player_input() -> void:
 	elif dir.length() > 0.1:
 		player_pet.aim_direction = dir.normalized()
 
-	var attack_down := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_key_pressed(KEY_J) or touch_attack_held
+	var attack_down := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_key_pressed(KEY_J) or touch_attack_held or attack_requested
 	if attack_down:
 		var attack_was_ready: bool = player_pet.attack_timer <= 0.0
 		var attacked: bool = player_pet.try_attack()
 		if not attack_input_was_down and attack_was_ready and not attacked:
 			_show_event("J 键是拍打：贴近敌人或地上道具再按")
 	attack_input_was_down = attack_down
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or Input.is_key_pressed(KEY_K) or touch_skill_held:
-		player_pet.try_skill()
-	var drop_down := Input.is_key_pressed(KEY_E) or touch_drop_requested
-	if drop_down and not drop_input_was_down:
+	attack_requested = false
+	var skill_down := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or Input.is_key_pressed(KEY_K) or touch_skill_held or skill_requested
+	if skill_down and (not skill_input_was_down or skill_requested):
+		if not player_pet.try_skill():
+			_show_event("K 键技能冷却中：还剩 %.1f 秒" % player_pet.skill_timer)
+		touch_skill_held = false
+	skill_input_was_down = skill_down
+	skill_requested = false
+	var drop_down := Input.is_key_pressed(KEY_E) or touch_drop_requested or drop_requested
+	if drop_down and (not drop_input_was_down or drop_requested):
 		if player_pet.carried_item == null:
 			_show_event("还没拿道具：靠近道具会自动拾取")
 		else:
@@ -410,6 +437,7 @@ func _handle_player_input() -> void:
 				_show_event("E 键已放下%s" % _item_name(dropped_kind))
 		touch_drop_requested = false
 	drop_input_was_down = drop_down
+	drop_requested = false
 
 
 func _drive_ai(pet: Node, delta: float) -> void:
@@ -540,6 +568,13 @@ func get_assisted_throw_direction(pet: Node, fallback: Vector2) -> Vector2:
 	if best != null:
 		return (best.global_position - pet.global_position).normalized()
 	return base_dir
+
+
+func pet_skill_used(pet: Node) -> void:
+	var skill := _skill_name(pet.skill_type)
+	if pet == player_pet:
+		_show_event("K 键释放：%s！" % skill)
+	_show_action_pop(pet.global_position + Vector2(0, -58), skill, _skill_color(pet.skill_type))
 
 
 func area_burst(source: Node, radius: float, damage: float, knock_force: float) -> void:
@@ -714,9 +749,10 @@ func update_hud() -> void:
 	]
 	if player_pet != null:
 		var item_name = "无" if player_pet.carried_item == null else _item_name(player_pet.carried_item.kind)
-		cooldown_label.text = "血量 %d/%d   技能 %.1fs   道具 %s   小鱼干 %d" % [
+		cooldown_label.text = "血量 %d/%d   K技能 %s %.1fs   道具 %s   小鱼干 %d" % [
 			int(ceil(player_pet.hp)),
 			int(ceil(player_pet.max_hp)),
+			_skill_name(player_pet.skill_type),
 			player_pet.skill_timer,
 			item_name,
 			GameState.coins
@@ -727,7 +763,7 @@ func update_hud() -> void:
 	else:
 		objective_label.text = "带罐头炸弹进敌方窝，别让对面拆你家"
 	event_label.text = last_event if event_timer > 0.0 else ""
-	status_label.text = "J 拍打/踢道具｜E 使用手上道具｜罐头炸弹拆窝｜胶带卷修家"
+	status_label.text = "J 拍打/踢道具｜K 释放技能｜E 使用手上道具｜罐头炸弹拆窝"
 	if guide_label != null:
 		guide_label.text = _guide_text()
 	if control_hint_label != null:
@@ -747,12 +783,12 @@ func _control_hint_text() -> String:
 		return ""
 	if player_pet.carried_item != null:
 		if player_pet.carried_item.kind == "boom":
-			return "你抱着罐头炸弹\n跑进敌方宠物窝 = 拆 1 格\nE 键：放下罐头炸弹\nJ 键 / 左键：拍打拦路宠物"
+			return "你抱着罐头炸弹\n跑进敌方宠物窝 = 拆 1 格\nK 键：%s\nE 键：放下罐头炸弹" % _skill_name(player_pet.skill_type)
 		if player_pet.carried_item.kind == "sock":
 			return "你拿着臭袜子\nE 键：朝附近敌人投掷减速\nJ 键 / 左键：近身拍打\nK 键 / 右键：使用技能"
 		if player_pet.carried_item.kind == "repair":
-			return "你拿着胶带卷\n跑回自家宠物窝 = 修 1 格\nE 键：放下胶带卷\nJ 键 / 左键：近身拍打"
-	return "操作提示\n移动：W A S D 键 / 方向键\nJ 键 / 鼠标左键：拍打敌人，或踢地上道具\nE 键：使用手上道具；没拿道具时不会生效"
+			return "你拿着胶带卷\n跑回自家宠物窝 = 修 1 格\nK 键：%s\nE 键：放下胶带卷" % _skill_name(player_pet.skill_type)
+	return "操作提示\n移动：W A S D 键 / 方向键\nJ 键 / 鼠标左键：拍打敌人或踢道具\nK 键 / 鼠标右键：%s\nE 键：使用手上道具" % _skill_name(player_pet.skill_type)
 
 
 func _guide_text() -> String:
@@ -998,6 +1034,30 @@ func _item_name(kind: String) -> String:
 	if kind == "sock":
 		return "臭袜子"
 	return "道具"
+
+
+func _skill_name(skill_type: String) -> String:
+	if skill_type == "dash":
+		return "冲刺"
+	if skill_type == "sprint":
+		return "加速"
+	if skill_type == "pulse":
+		return "推开"
+	if skill_type == "shield":
+		return "护盾"
+	return "冲刺"
+
+
+func _skill_color(skill_type: String) -> Color:
+	if skill_type == "dash":
+		return Color(1.0, 0.66, 0.18)
+	if skill_type == "sprint":
+		return Color(1.0, 0.88, 0.20)
+	if skill_type == "pulse":
+		return Color(0.78, 0.52, 1.0)
+	if skill_type == "shield":
+		return Color(0.34, 0.74, 1.0)
+	return Color(1.0, 0.82, 0.22)
 
 
 func _base_name(team: String) -> String:
