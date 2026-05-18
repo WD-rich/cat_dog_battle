@@ -68,4 +68,4 @@ Basic steps:
 5. Add an `Android` preset.
 6. Export an APK for device testing.
 
-The battle scene already shows touch controls on Android/mobile builds.
+Android/mobile touch controls are intentionally hidden in the current Web-first prototype. Re-enable and polish touch controls before exporting a real mobile build.
